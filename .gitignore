@@ -32,3 +32,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Session and generated artifacts
+plan.md
+screen.png
+app/stitch_student_registry_ui_design/
+app/google-services (1).json

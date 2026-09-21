@@ -1,6 +1,7 @@
 package com.studentregistry
 
 import android.content.Context
+import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -26,11 +27,170 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+data class StudentFormErrors(
+    val name: String? = null,
+    val age: String? = null,
+    val contact: String? = null,
+    val parentContact: String? = null,
+    val aadhaarNumber: String? = null,
+    val apparId: String? = null,
+    val penId: String? = null,
+    val fatherName: String? = null,
+    val motherName: String? = null,
+    val religion: String? = null,
+    val caste: String? = null,
+    val bloodGroup: String? = null,
+    val admissionNumber: String? = null,
+    val admissionDate: String? = null,
+    val bankNameAddress: String? = null,
+    val email: String? = null,
+    val birthday: String? = null,
+    val notes: String? = null
+) {
+    val hasErrors: Boolean
+        get() = listOf(
+            name,
+            age,
+            contact,
+            parentContact,
+            aadhaarNumber,
+            apparId,
+            penId,
+            fatherName,
+            motherName,
+            religion,
+            caste,
+            bloodGroup,
+            admissionNumber,
+            admissionDate,
+            bankNameAddress,
+            email,
+            birthday,
+            notes
+        ).any { it != null }
+
+    fun firstMessage(): String? = listOf(
+        name,
+        age,
+        contact,
+        parentContact,
+        aadhaarNumber,
+        apparId,
+        penId,
+        fatherName,
+        motherName,
+        religion,
+        caste,
+        bloodGroup,
+        admissionNumber,
+        admissionDate,
+        bankNameAddress,
+        email,
+        birthday,
+        notes
+    ).firstOrNull { it != null }
+}
+
+private val validBloodGroups = setOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
+
+private fun isValidIsoDate(value: String): Boolean = runCatching {
+    java.time.LocalDate.parse(value, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+}.isSuccess
+
+private fun hasValidPhoneDigits(value: String): Boolean {
+    val digits = value.filter(Char::isDigit)
+    return digits.length in 10..15
+}
+
+private fun validateOptionalName(value: String, label: String): String? {
+    val normalized = value.trim()
+    if (normalized.isBlank()) return null
+    return if (normalized.length < 2) "Enter a valid $label." else null
+}
+
+fun validateStudentForm(input: StudentFormInput): StudentFormErrors {
+    val trimmedName = input.name.trim()
+    val ageValue = input.age.trim().toIntOrNull()
+    val trimmedContact = input.contact.trim()
+    val trimmedParentContact = input.parentContact.trim()
+    val trimmedAadhaar = input.aadhaarNumber.filter(Char::isDigit)
+    val trimmedApparId = input.apparId.filter(Char::isDigit)
+    val trimmedPenId = input.penId.filter(Char::isDigit)
+    val trimmedEmail = input.email.trim()
+    val trimmedBirthday = input.birthday.trim()
+    val trimmedAdmissionDate = input.admissionDate.trim()
+    val trimmedBloodGroup = input.bloodGroup.trim().uppercase()
+    val trimmedBank = input.bankNameAddress.trim()
+    val notes = input.notes.trim()
+
+    return StudentFormErrors(
+        name = when {
+            trimmedName.isBlank() -> "Full name is required."
+            trimmedName.length < 2 -> "Enter a valid full name."
+            else -> null
+        },
+        age = when {
+            input.age.trim().isBlank() -> "Select date of birth to auto-calculate age."
+            ageValue == null || ageValue !in 3..120 -> "Date of birth results in an invalid age."
+            else -> null
+        },
+        contact = if (trimmedContact.isNotBlank() && !hasValidPhoneDigits(trimmedContact)) {
+            "Enter a valid 10 digit student contact number."
+        } else null,
+        parentContact = if (trimmedParentContact.isNotBlank() && !hasValidPhoneDigits(trimmedParentContact)) {
+            "Enter a valid 10 digit parent contact number."
+        } else null,
+        aadhaarNumber = if (input.aadhaarNumber.isNotBlank() && trimmedAadhaar.length != 12) {
+            "Aadhaar number must be exactly 12 digits."
+        } else null,
+        apparId = if (input.apparId.isNotBlank() && trimmedApparId.length != 12) {
+            "APPAR ID must be exactly 12 digits."
+        } else null,
+        penId = if (input.penId.isNotBlank() && trimmedPenId.length != 11) {
+            "PEN ID must be exactly 11 digits."
+        } else null,
+        fatherName = validateOptionalName(input.fatherName, "father's name"),
+        motherName = validateOptionalName(input.motherName, "mother's name"),
+        religion = null,
+        caste = null,
+        bloodGroup = if (trimmedBloodGroup.isNotBlank() && trimmedBloodGroup !in validBloodGroups) {
+            "Enter a valid blood group like A+, B+, AB+, or O-."
+        } else null,
+        admissionNumber = null,
+        admissionDate = if (trimmedAdmissionDate.isNotBlank() && !isValidIsoDate(trimmedAdmissionDate)) {
+            "Admission date must use YYYY-MM-DD format."
+        } else null,
+        bankNameAddress = if (trimmedBank.isNotBlank() && trimmedBank.length < 5) {
+            "Enter bank name and address."
+        } else null,
+        email = if (trimmedEmail.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            "Enter a valid email address."
+        } else null,
+        birthday = when {
+            trimmedBirthday.isBlank() -> "Date of birth is required."
+            !isValidIsoDate(trimmedBirthday) -> "Date of birth must use YYYY-MM-DD format."
+            else -> null
+        },
+        notes = if (notes.length > 300) "Notes cannot exceed 300 characters." else null
+    )
+}
+
 data class StudentFormInput(
     val name: String,
     val age: String,
     val contact: String,
     val parentContact: String,
+    val aadhaarNumber: String,
+    val apparId: String,
+    val penId: String,
+    val fatherName: String,
+    val motherName: String,
+    val religion: String,
+    val caste: String,
+    val bloodGroup: String,
+    val admissionNumber: String,
+    val admissionDate: String,
+    val bankNameAddress: String,
     val email: String,
     val birthday: String,
     val notes: String
@@ -111,11 +271,13 @@ class MainViewModel(
             return
         }
 
-        val parsedAge = input.age.toIntOrNull()
-        if (input.name.isBlank() || parsedAge == null) {
-            viewModelScope.launch { _messages.emit("Name and valid age are required.") }
+        val validation = validateStudentForm(input)
+        if (validation.hasErrors) {
+            viewModelScope.launch { _messages.emit(validation.firstMessage() ?: "Please correct the form errors.") }
             return
         }
+
+        val parsedAge = input.age.trim().toInt()
 
         viewModelScope.launch(Dispatchers.IO) {
             val student = StudentEntity(
@@ -125,6 +287,17 @@ class MainViewModel(
                 age = parsedAge,
                 contact = input.contact.trim(),
                 parentContact = input.parentContact.trim(),
+                aadhaarNumber = input.aadhaarNumber.trim(),
+                apparId = input.apparId.trim(),
+                penId = input.penId.trim(),
+                fatherName = input.fatherName.trim(),
+                motherName = input.motherName.trim(),
+                religion = input.religion.trim(),
+                caste = input.caste.trim(),
+                bloodGroup = input.bloodGroup.trim(),
+                admissionNumber = input.admissionNumber.trim(),
+                admissionDate = input.admissionDate.trim(),
+                bankNameAddress = input.bankNameAddress.trim(),
                 email = input.email.trim(),
                 birthday = input.birthday.trim(),
                 notes = input.notes.trim(),

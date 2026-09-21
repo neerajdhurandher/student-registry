@@ -1,6 +1,5 @@
 package com.studentregistry.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -28,7 +27,11 @@ fun StudentRegistryTheme(
     fontScale: Float,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme || isSystemInDarkTheme()) DarkColors else LightColors
+    // Theme is fully controlled by the user's explicit Settings toggle.
+    // We intentionally ignore the system/device dark mode so the app
+    // always starts in Light theme by default and only switches when the
+    // user changes it from Settings, applying consistently across every screen.
+    val colorScheme = if (darkTheme) DarkColors else LightColors
     val density = LocalDensity.current
     val scaledDensity = remember(density.density, fontScale) {
         Density(density = density.density, fontScale = fontScale.coerceIn(0.85f, 1.3f))

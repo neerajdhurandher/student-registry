@@ -61,6 +61,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -73,6 +75,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -418,6 +421,10 @@ private val LoginOnSurfaceVariant = Color(0xFF434654)
 @Composable
 private fun LoginScreen(onGoogleSignIn: () -> Unit) {
     var isSigningIn by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
+    val titleColor = colorScheme.onSurface
+    val titleColorVariant = colorScheme.onSurfaceVariant
+    val outlineColor = colorScheme.outlineVariant
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -448,7 +455,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                         Icon(
                             imageVector = Icons.Filled.School,
                             contentDescription = null,
-                            tint = LoginPrimary,
+                            tint = colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -463,7 +470,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                     Icon(
                         imageVector = Icons.Filled.VerifiedUser,
                         contentDescription = null,
-                        tint = LoginPrimary,
+                        tint = colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -490,7 +497,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                 text = "Student Registry",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = LoginOnSurface
+                color = titleColor
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -499,7 +506,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                 text = "Securely manage your students' records, contact " +
                     "details, and birthdays — all backed up to your Google account.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = LoginOnSurfaceVariant,
+                color = titleColorVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 320.dp)
             )
@@ -511,7 +518,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = LoginSurfaceCard),
-                border = androidx.compose.foundation.BorderStroke(1.dp, LoginOutlineVariant),
+                border = androidx.compose.foundation.BorderStroke(1.dp, outlineColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Row(
@@ -527,7 +534,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                         Icon(
                             imageVector = Icons.Filled.WorkspacePremium,
                             contentDescription = null,
-                            tint = LoginPrimary,
+                            tint = colorScheme.primary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -542,7 +549,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                                 text = "Teacher Workspace",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = LoginOnSurface
+                                color = titleColor
                             )
                             Surface(
                                 color = LoginTertiaryContainer,
@@ -561,7 +568,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                             text = "Access your student roster, search, and export tools " +
                                 "the moment you sign in.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = LoginOnSurfaceVariant
+                            color = titleColorVariant
                         )
                     }
                 }
@@ -580,7 +587,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LoginPrimary,
+                    containerColor = colorScheme.primary,
                     contentColor = Color.White
                 )
             ) {
@@ -612,7 +619,7 @@ private fun LoginScreen(onGoogleSignIn: () -> Unit) {
             Text(
                 text = "Student Registry • Private & securely synced",
                 style = MaterialTheme.typography.labelSmall,
-                color = LoginOnSurfaceVariant.copy(alpha = 0.8f)
+                color = titleColorVariant.copy(alpha = 0.8f)
             )
         }
     }
@@ -670,10 +677,19 @@ private fun StudentListScreen(
     onAddStudent: () -> Unit,
     onOpenStudent: (String) -> Unit
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+    val screenColor = colorScheme.background
+    val cardColor = colorScheme.surface
+    val elevatedCardColor = colorScheme.surfaceContainerLow
+    val outlineColor = colorScheme.outlineVariant
+    val primaryTint = colorScheme.primary.copy(alpha = 0.14f)
+    val titleColor = colorScheme.onSurface
+    val secondaryTextColor = colorScheme.onSurfaceVariant
+
     Box(modifier = Modifier.fillMaxSize()) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = LoginSurfaceCanvas
+        color = screenColor
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // --- Custom top app bar ---
@@ -689,13 +705,13 @@ private fun StudentListScreen(
                         text = "Student Registry",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = LoginOnSurface
+                        color = titleColor
                     )
                     if (teacherName.isNotBlank()) {
                         Text(
                             text = teacherName,
                             style = MaterialTheme.typography.labelSmall,
-                            color = ListSecondary
+                            color = secondaryTextColor
                         )
                     }
                 }
@@ -704,14 +720,14 @@ private fun StudentListScreen(
                         Icon(
                             imageVector = Icons.Default.FileDownload,
                             contentDescription = "Export",
-                            tint = LoginOnSurfaceVariant
+                            tint = secondaryTextColor
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = LoginOnSurfaceVariant
+                            tint = secondaryTextColor
                         )
                     }
                 }
@@ -727,8 +743,8 @@ private fun StudentListScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(50),
-                    color = LoginSurfaceCard,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LoginOutlineVariant),
+                    color = cardColor,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, outlineColor),
                     shadowElevation = 2.dp
                 ) {
                     Row(
@@ -740,7 +756,7 @@ private fun StudentListScreen(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = null,
-                            tint = ListSecondary,
+                            tint = secondaryTextColor,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -751,13 +767,13 @@ private fun StudentListScreen(
                                 .weight(1f)
                                 .padding(vertical = 14.dp),
                             singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = LoginOnSurface),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = titleColor),
                             decorationBox = { innerTextField ->
                                 if (query.isEmpty()) {
                                     Text(
                                         text = "Search by name, contact, or email...",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = ListOutline
+                                        color = secondaryTextColor
                                     )
                                 }
                                 innerTextField()
@@ -780,10 +796,10 @@ private fun StudentListScreen(
                         Surface(
                             onClick = { onFilterChange(filter) },
                             shape = RoundedCornerShape(50),
-                            color = if (selected) ListSecondaryContainer else LoginSurfaceCard,
+                            color = if (selected) primaryTint else cardColor,
                             border = androidx.compose.foundation.BorderStroke(
                                 width = 1.dp,
-                                color = if (selected) LoginPrimary.copy(alpha = 0.3f) else Color(0xFFCBD5E1)
+                                color = if (selected) colorScheme.primary.copy(alpha = 0.3f) else outlineColor
                             )
                         ) {
                             Row(
@@ -794,7 +810,7 @@ private fun StudentListScreen(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = LoginPrimary,
+                                        tint = colorScheme.primary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -802,7 +818,7 @@ private fun StudentListScreen(
                                 Text(
                                     text = filter.label,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = if (selected) LoginPrimary else ListSecondary
+                                    color = if (selected) colorScheme.primary else secondaryTextColor
                                 )
                             }
                         }
@@ -821,13 +837,13 @@ private fun StudentListScreen(
                             text = "No students found",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = LoginOnSurface
+                            color = titleColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Try a different search or filter, or add your first student.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = ListSecondary,
+                            color = secondaryTextColor,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -846,8 +862,8 @@ private fun StudentListScreen(
                                     .fillMaxWidth()
                                     .clickable { onOpenStudent(student.id) },
                                 shape = RoundedCornerShape(16.dp),
-                                color = LoginSurfaceCard,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, LoginOutlineVariant)
+                                color = cardColor,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, outlineColor)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(14.dp),
@@ -873,20 +889,20 @@ private fun StudentListScreen(
                                                 text = student.name,
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = LoginOnSurface,
+                                                color = titleColor,
                                                 modifier = Modifier.weight(1f, fill = false)
                                             )
                                             if (birthdayBadge != null) {
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Surface(
-                                                    color = ListSurfaceContainer,
+                                                    color = primaryTint,
                                                     shape = RoundedCornerShape(50)
                                                 ) {
                                                     Text(
                                                         text = birthdayBadge,
                                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = LoginOnSurfaceVariant
+                                                        color = secondaryTextColor
                                                     )
                                                 }
                                             }
@@ -896,14 +912,14 @@ private fun StudentListScreen(
                                             text = "Age: ${student.age}" +
                                                 if (student.contact.isNotBlank()) " • ${student.contact}" else "",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = ListSecondary
+                                            color = secondaryTextColor
                                         )
                                         if (student.email.isNotBlank()) {
                                             Spacer(modifier = Modifier.height(6.dp))
                                             Surface(
-                                                color = ListSurfaceContainerLow,
+                                                color = colorScheme.surfaceContainerLow,
                                                 shape = RoundedCornerShape(6.dp),
-                                                border = androidx.compose.foundation.BorderStroke(1.dp, ListSecondaryContainer)
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.outlineVariant)
                                             ) {
                                                 Row(
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -912,14 +928,14 @@ private fun StudentListScreen(
                                                     Icon(
                                                         imageVector = Icons.Default.Email,
                                                         contentDescription = null,
-                                                        tint = LoginPrimary,
+                                                        tint = colorScheme.primary,
                                                         modifier = Modifier.size(13.dp)
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
                                                         text = student.email,
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = LoginPrimary
+                                                        color = colorScheme.primary
                                                     )
                                                 }
                                             }
@@ -928,7 +944,7 @@ private fun StudentListScreen(
                                     Icon(
                                         imageVector = Icons.Default.ChevronRight,
                                         contentDescription = null,
-                                        tint = ListOutline,
+                                        tint = secondaryTextColor,
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
@@ -945,7 +961,7 @@ private fun StudentListScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp),
-            containerColor = LoginPrimary,
+            containerColor = colorScheme.primary,
             contentColor = Color.White,
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -965,12 +981,74 @@ private fun AddEditStudentScreen(
     var age by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.age?.toString().orEmpty()) }
     var contact by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.contact.orEmpty()) }
     var parentContact by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.parentContact.orEmpty()) }
+    var aadhaarNumber by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.aadhaarNumber.orEmpty()) }
+    var apparId by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.apparId.orEmpty()) }
+    var penId by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.penId.orEmpty()) }
+    var fatherName by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.fatherName.orEmpty()) }
+    var motherName by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.motherName.orEmpty()) }
+    var religion by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.religion.orEmpty()) }
+    var caste by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.caste.orEmpty()) }
+    var bloodGroup by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.bloodGroup.orEmpty()) }
+    var admissionNumber by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.admissionNumber.orEmpty()) }
+    var admissionDate by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.admissionDate.orEmpty()) }
+    var bankNameAddress by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.bankNameAddress.orEmpty()) }
     var email by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.email.orEmpty()) }
     var birthday by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.birthday.orEmpty()) }
     var notes by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.notes.orEmpty()) }
+    var attemptedSave by rememberSaveable(initialStudent?.id) { mutableStateOf(false) }
+    var showBirthdayPicker by rememberSaveable { mutableStateOf(false) }
+    var showAdmissionDatePicker by rememberSaveable { mutableStateOf(false) }
     val isEditing = initialStudent != null
 
-    Surface(modifier = Modifier.fillMaxSize(), color = LoginSurfaceCanvas) {
+    // Age is derived from Date of Birth and cannot be edited by hand.
+    LaunchedEffect(birthday) {
+        age = calculateAgeFromBirthday(birthday)
+    }
+    val formInput = StudentFormInput(
+        name = name,
+        age = age,
+        contact = contact,
+        parentContact = parentContact,
+        aadhaarNumber = aadhaarNumber,
+        apparId = apparId,
+        penId = penId,
+        fatherName = fatherName,
+        motherName = motherName,
+        religion = religion,
+        caste = caste,
+        bloodGroup = bloodGroup,
+        admissionNumber = admissionNumber,
+        admissionDate = admissionDate,
+        bankNameAddress = bankNameAddress,
+        email = email,
+        birthday = birthday,
+        notes = notes
+    )
+    val validationErrors = validateStudentForm(formInput)
+    val nameError = visibleFieldError(validationErrors.name, name, attemptedSave)
+    val ageError = visibleFieldError(validationErrors.age, age, attemptedSave)
+    val birthdayError = visibleFieldError(validationErrors.birthday, birthday, attemptedSave)
+    val contactError = visibleFieldError(validationErrors.contact, contact, attemptedSave)
+    val parentContactError = visibleFieldError(validationErrors.parentContact, parentContact, attemptedSave)
+    val emailError = visibleFieldError(validationErrors.email, email, attemptedSave)
+    val aadhaarError = visibleFieldError(validationErrors.aadhaarNumber, aadhaarNumber, attemptedSave)
+    val apparIdError = visibleFieldError(validationErrors.apparId, apparId, attemptedSave)
+    val penIdError = visibleFieldError(validationErrors.penId, penId, attemptedSave)
+    val fatherNameError = visibleFieldError(validationErrors.fatherName, fatherName, attemptedSave)
+    val motherNameError = visibleFieldError(validationErrors.motherName, motherName, attemptedSave)
+    val bloodGroupError = visibleFieldError(validationErrors.bloodGroup, bloodGroup, attemptedSave)
+    val admissionDateError = visibleFieldError(validationErrors.admissionDate, admissionDate, attemptedSave)
+    val bankNameAddressError = visibleFieldError(validationErrors.bankNameAddress, bankNameAddress, attemptedSave)
+    val notesError = visibleFieldError(validationErrors.notes, notes, attemptedSave)
+    val colorScheme = MaterialTheme.colorScheme
+    val screenColor = colorScheme.background
+    val cardColor = colorScheme.surface
+    val outlineColor = colorScheme.outlineVariant
+    val titleColor = colorScheme.onSurface
+    val secondaryTextColor = colorScheme.onSurfaceVariant
+    val primaryTint = colorScheme.primary.copy(alpha = 0.14f)
+
+    Surface(modifier = Modifier.fillMaxSize(), color = screenColor) {
         Column(modifier = Modifier.fillMaxSize()) {
             // --- Top bar ---
             Row(
@@ -980,13 +1058,13 @@ private fun AddEditStudentScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = LoginOnSurface)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = titleColor)
                 }
                 Text(
                     text = if (isEditing) "Edit Student" else "Add Student",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = LoginOnSurface
+                    color = titleColor
                 )
             }
 
@@ -1004,13 +1082,13 @@ private fun AddEditStudentScreen(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .background(LoginPrimaryContainer, CircleShape),
+                                .background(primaryTint, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Badge,
                                 contentDescription = null,
-                                tint = LoginPrimary,
+                                tint = colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1020,13 +1098,13 @@ private fun AddEditStudentScreen(
                                 text = if (isEditing) "Update Academic Profile" else "New Academic Profile",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = LoginOnSurface
+                                color = titleColor
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Fill in student credentials for registration. Fields marked with * are required for enrollment.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = ListSecondary
+                                color = secondaryTextColor
                             )
                         }
                     }
@@ -1043,41 +1121,49 @@ private fun AddEditStudentScreen(
                         placeholder = { Text("e.g., Sunil Kumar") },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                         singleLine = true,
+                        isError = nameError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption("Legal first and family name")
+                    FormFieldCaption(nameError ?: "Legal first and family name", isError = nameError != null)
 
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(modifier = Modifier.weight(1f)) {
-                            FormFieldLabel("Age", required = true)
-                            OutlinedTextField(
-                                value = age,
-                                onValueChange = { age = it.filter(Char::isDigit) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                                ),
-                                colors = formFieldColors()
-                            )
-                            FormFieldCaption("Valid age")
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            FormFieldLabel("Date of Birth", required = false)
+                            FormFieldLabel("Date of Birth", required = true)
                             OutlinedTextField(
                                 value = birthday,
                                 onValueChange = { birthday = it },
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("yyyy-MM-dd") },
+                                readOnly = true,
                                 singleLine = true,
                                 trailingIcon = {
-                                    Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    IconButton(onClick = { showBirthdayPicker = true }) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = "Pick date of birth", modifier = Modifier.size(18.dp))
+                                    }
                                 },
+                                isError = birthdayError != null,
                                 colors = formFieldColors()
                             )
-                            FormFieldCaption("Format: YYYY-MM-DD")
+                            FormFieldCaption(birthdayError ?: "Format: YYYY-MM-DD", isError = birthdayError != null)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            FormFieldLabel("Age", required = true)
+                            OutlinedTextField(
+                                value = age,
+                                onValueChange = {},
+                                modifier = Modifier.fillMaxWidth(),
+                                readOnly = true,
+                                enabled = false,
+                                singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                ),
+                                isError = ageError != null,
+                                colors = formFieldColors()
+                            )
+                            FormFieldCaption(ageError ?: "Auto-calculated from date of birth", isError = ageError != null)
                         }
                     }
                 }
@@ -1097,9 +1183,10 @@ private fun AddEditStudentScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                         ),
+                        isError = contactError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption("Student personal mobile")
+                    FormFieldCaption(contactError ?: "Student personal mobile", isError = contactError != null)
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -1114,9 +1201,10 @@ private fun AddEditStudentScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                         ),
+                        isError = parentContactError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption("Primary parent or guardian mobile")
+                    FormFieldCaption(parentContactError ?: "Primary parent or guardian mobile", isError = parentContactError != null)
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -1131,25 +1219,221 @@ private fun AddEditStudentScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
                         ),
+                        isError = emailError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption("School or parent contact email")
+                    FormFieldCaption(emailError ?: "School or parent contact email", isError = emailError != null)
+                }
+
+                FormSectionCard {
+                    FormSectionHeader(icon = Icons.Default.Badge, title = "Academic & Identity IDs")
+
+                    FormFieldLabel("Student Aadhaar Card No.", required = false)
+                    OutlinedTextField(
+                        value = aadhaarNumber,
+                        onValueChange = { aadhaarNumber = it.filter(Char::isDigit).take(12) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("12-digit Aadhaar number") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        isError = aadhaarError != null,
+                        colors = formFieldColors()
+                    )
+                    if (aadhaarError != null) {
+                        FormFieldCaption(aadhaarError, isError = true)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("APPAR ID", required = false)
+                    OutlinedTextField(
+                        value = apparId,
+                        onValueChange = { apparId = it.filter(Char::isDigit).take(12) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("12-digit APPAR ID") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        isError = apparIdError != null,
+                        colors = formFieldColors()
+                    )
+                    if (apparIdError != null) {
+                        FormFieldCaption(apparIdError, isError = true)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("PEN ID", required = false)
+                    OutlinedTextField(
+                        value = penId,
+                        onValueChange = { penId = it.filter(Char::isDigit).take(11) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("11-digit PEN ID") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        isError = penIdError != null,
+                        colors = formFieldColors()
+                    )
+                    if (penIdError != null) {
+                        FormFieldCaption(penIdError, isError = true)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("Admission No.", required = false)
+                    OutlinedTextField(
+                        value = admissionNumber,
+                        onValueChange = { admissionNumber = it.filter(Char::isDigit) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Enter admission number") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        isError = false,
+                        colors = formFieldColors()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("Date of Admission", required = false)
+                    OutlinedTextField(
+                        value = admissionDate,
+                        onValueChange = { admissionDate = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("yyyy-MM-dd") },
+                        readOnly = true,
+                        trailingIcon = {
+                            IconButton(onClick = { showAdmissionDatePicker = true }) {
+                                Icon(Icons.Default.CalendarToday, contentDescription = "Pick admission date", modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        singleLine = true,
+                        isError = admissionDateError != null,
+                        colors = formFieldColors()
+                    )
+                    FormFieldCaption(admissionDateError ?: "Format: YYYY-MM-DD", isError = admissionDateError != null)
+                }
+
+
+                FormSectionCard {
+                    FormSectionHeader(icon = Icons.Default.SupervisorAccount, title = "Family & Personal Details")
+
+                    FormFieldLabel("Father's Name", required = false)
+                    OutlinedTextField(
+                        value = fatherName,
+                        onValueChange = { fatherName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Enter father's name") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        singleLine = true,
+                        isError = aadhaarError != null,
+                        colors = formFieldColors()
+                    )
+                    if (aadhaarError != null) {
+                        FormFieldCaption(aadhaarError, isError = true)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("Mother's Name", required = false)
+                    OutlinedTextField(
+                        value = motherName,
+                        onValueChange = { motherName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Enter mother's name") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        singleLine = true,
+                        isError = aadhaarError != null,
+                        colors = formFieldColors()
+                    )
+                    if (aadhaarError != null) {
+                        FormFieldCaption(aadhaarError, isError = true)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            FormFieldLabel("Religion", required = false)
+                            OutlinedTextField(
+                                value = religion,
+                                onValueChange = { religion = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = formFieldColors()
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            FormFieldLabel("Caste", required = false)
+                            OutlinedTextField(
+                                value = caste,
+                                onValueChange = { caste = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = formFieldColors()
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("Blood Group", required = false)
+                    OutlinedTextField(
+                        value = bloodGroup,
+                        onValueChange = { bloodGroup = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g., O+") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                        singleLine = true,
+                        isError = bloodGroupError != null,
+                        colors = formFieldColors()
+                    )
+                    if (bloodGroupError != null) {
+                        FormFieldCaption(bloodGroupError, isError = true)
+                    }
+                }
+
+                FormSectionCard {
+                    FormSectionHeader(icon = Icons.Default.Badge, title = "Bank Information")
+                    FormFieldLabel("Bank Name & Address", required = false)
+                    OutlinedTextField(
+                        value = bankNameAddress,
+                        onValueChange = { bankNameAddress = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(96.dp),
+                        placeholder = { Text("Enter bank name, branch, and address") },
+                        isError = bankNameAddressError != null,
+                        colors = formFieldColors()
+                    )
+                    if (bankNameAddressError != null) {
+                        FormFieldCaption(bankNameAddressError, isError = true)
+                    }
                 }
 
                 // --- Notes & Observations ---
                 FormSectionCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FormSectionHeader(icon = Icons.AutoMirrored.Filled.Notes, title = "Notes & Observations")
-                        Text(
-                            text = "${notes.length} / 300",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ListSecondary
-                        )
-                    }
+                    FormSectionHeader(
+                        icon = Icons.AutoMirrored.Filled.Notes,
+                        title = "Notes & Observations",
+                        trailing = {
+                            Text(
+                                text = "${notes.length} / 300",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = secondaryTextColor
+                            )
+                        }
+                    )
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { if (it.length <= 300) notes = it },
@@ -1157,8 +1441,12 @@ private fun AddEditStudentScreen(
                             .fillMaxWidth()
                             .height(110.dp),
                         placeholder = { Text("Add classroom observations, medical notes, or guardian preferences...") },
+                        isError = notesError != null,
                         colors = formFieldColors()
                     )
+                    if (notesError != null) {
+                        FormFieldCaption(notesError, isError = true)
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1168,20 +1456,20 @@ private fun AddEditStudentScreen(
                         Text(
                             text = "Confidential educator notes",
                             style = MaterialTheme.typography.labelSmall,
-                            color = ListSecondary
+                            color = secondaryTextColor
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = ListSecondary,
+                                tint = secondaryTextColor,
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Private",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = ListSecondary
+                                color = secondaryTextColor
                             )
                         }
                     }
@@ -1191,7 +1479,7 @@ private fun AddEditStudentScreen(
             }
 
             // --- Bottom action bar ---
-            Surface(color = LoginSurfaceCanvas, shadowElevation = 8.dp) {
+            Surface(color = screenColor, shadowElevation = 8.dp) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1202,8 +1490,8 @@ private fun AddEditStudentScreen(
                         onClick = onBack,
                         modifier = Modifier.weight(1f),
                         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                            containerColor = LoginPrimaryContainer,
-                            contentColor = LoginPrimary
+                            containerColor = primaryTint,
+                            contentColor = colorScheme.primary
                         ),
                         border = null,
                         shape = RoundedCornerShape(12.dp)
@@ -1212,20 +1500,14 @@ private fun AddEditStudentScreen(
                     }
                     Button(
                         onClick = {
-                            onSave(
-                                StudentFormInput(
-                                    name = name,
-                                    age = age,
-                                    contact = contact,
-                                    parentContact = parentContact,
-                                    email = email,
-                                    birthday = birthday,
-                                    notes = notes
-                                )
-                            )
+                            attemptedSave = true
+                            if (validationErrors.hasErrors) {
+                                return@Button
+                            }
+                            onSave(formInput)
                         },
                         modifier = Modifier.weight(2f),
-                        colors = ButtonDefaults.buttonColors(containerColor = LoginPrimary, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary, contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1236,14 +1518,89 @@ private fun AddEditStudentScreen(
             }
         }
     }
+
+    if (showBirthdayPicker) {
+        val birthdayPickerState = rememberDatePickerState(
+            initialSelectedDateMillis = isoDateToUtcMillis(birthday) ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showBirthdayPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    birthdayPickerState.selectedDateMillis?.let { millis ->
+                        birthday = utcMillisToIsoDate(millis)
+                    }
+                    showBirthdayPicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBirthdayPicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = birthdayPickerState)
+        }
+    }
+
+    if (showAdmissionDatePicker) {
+        val admissionDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = isoDateToUtcMillis(admissionDate) ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showAdmissionDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    admissionDatePickerState.selectedDateMillis?.let { millis ->
+                        admissionDate = utcMillisToIsoDate(millis)
+                    }
+                    showAdmissionDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAdmissionDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = admissionDatePickerState)
+        }
+    }
 }
+
+private fun calculateAgeFromBirthday(birthday: String): String {
+    return runCatching {
+        val birthDate = java.time.LocalDate.parse(birthday)
+        val today = java.time.LocalDate.now()
+        if (birthDate.isAfter(today)) return ""
+        java.time.Period.between(birthDate, today).years
+    }.getOrNull()?.toString().orEmpty()
+}
+
+private fun isoDateToUtcMillis(isoDate: String): Long? = runCatching {
+    java.time.LocalDate.parse(isoDate).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+}.getOrNull()
+
+private fun utcMillisToIsoDate(millis: Long): String =
+    java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString()
 
 @Composable
 private fun formFieldColors() = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
     focusedBorderColor = LoginPrimary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    errorBorderColor = MaterialTheme.colorScheme.error,
     focusedLabelColor = LoginPrimary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    errorLabelColor = MaterialTheme.colorScheme.error,
     focusedLeadingIconColor = LoginPrimary,
-    cursorColor = LoginPrimary
+    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    errorLeadingIconColor = MaterialTheme.colorScheme.error,
+    focusedTrailingIconColor = LoginPrimary,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    errorTrailingIconColor = MaterialTheme.colorScheme.error,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    errorTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    cursorColor = LoginPrimary,
+    errorCursorColor = MaterialTheme.colorScheme.error
 )
 
 @Composable
@@ -1251,8 +1608,8 @@ private fun FormSectionCard(content: @Composable androidx.compose.foundation.lay
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = LoginSurfaceCard,
-        border = androidx.compose.foundation.BorderStroke(1.dp, LoginOutlineVariant)
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1263,33 +1620,53 @@ private fun FormSectionCard(content: @Composable androidx.compose.foundation.lay
 }
 
 @Composable
-private fun FormSectionHeader(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = LoginOnSurfaceVariant, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = LoginOnSurface
-        )
+private fun FormSectionHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        trailing?.invoke()
     }
-    androidx.compose.material3.HorizontalDivider(color = LoginOutlineVariant)
+    androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Composable
 private fun FormFieldLabel(text: String, required: Boolean) {
     Row {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = LoginOnSurface)
+        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         if (required) {
             Text(" *", style = MaterialTheme.typography.labelLarge, color = Color(0xFFBA1A1A))
         }
     }
 }
 
+private fun visibleFieldError(error: String?, value: String, attemptedSave: Boolean): String? {
+    if (error == null) return null
+    return if (attemptedSave || value.isNotBlank()) error else null
+}
+
 @Composable
-private fun FormFieldCaption(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = ListSecondary)
+private fun FormFieldCaption(text: String, isError: Boolean = false) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1346,6 +1723,17 @@ private fun StudentDetailScreen(
             Text("Age: ${student.age}")
             Text("Student contact: ${student.contact}")
             Text("Parent contact: ${student.parentContact}")
+            if (student.aadhaarNumber.isNotBlank()) Text("Aadhaar: ${student.aadhaarNumber}")
+            if (student.apparId.isNotBlank()) Text("APPAR ID: ${student.apparId}")
+            if (student.penId.isNotBlank()) Text("PEN ID: ${student.penId}")
+            if (student.fatherName.isNotBlank()) Text("Father's name: ${student.fatherName}")
+            if (student.motherName.isNotBlank()) Text("Mother's name: ${student.motherName}")
+            if (student.religion.isNotBlank()) Text("Religion: ${student.religion}")
+            if (student.caste.isNotBlank()) Text("Caste: ${student.caste}")
+            if (student.bloodGroup.isNotBlank()) Text("Blood group: ${student.bloodGroup}")
+            if (student.admissionNumber.isNotBlank()) Text("Admission no.: ${student.admissionNumber}")
+            if (student.admissionDate.isNotBlank()) Text("Admission date: ${student.admissionDate}")
+            if (student.bankNameAddress.isNotBlank()) Text("Bank: ${student.bankNameAddress}")
             Text("Email: ${student.email}")
             Text("Birthday: ${student.birthday}")
             Text("Notes: ${student.notes}")

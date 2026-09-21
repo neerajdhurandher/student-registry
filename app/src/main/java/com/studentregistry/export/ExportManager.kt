@@ -15,13 +15,25 @@ class ExportManager(private val context: Context) {
         val targetDir = context.getExternalFilesDir("exports") ?: context.filesDir
         val file = File(targetDir, "students-${LocalDateTime.now().format(formatter)}.csv")
         val lines = buildList {
-            add("Name,Age,Contact,Email,Birthday,Notes")
+            add("Name,Age,Student Contact,Parent Contact,Aadhaar Number,APPAR ID,PEN ID,Father Name,Mother Name,Religion,Caste,Blood Group,Admission Number,Admission Date,Bank Name & Address,Email,Birthday,Notes")
             students.forEach { student ->
                 add(
                     listOf(
                         student.name,
                         student.age.toString(),
                         student.contact,
+                        student.parentContact,
+                        student.aadhaarNumber,
+                        student.apparId,
+                        student.penId,
+                        student.fatherName,
+                        student.motherName,
+                        student.religion,
+                        student.caste,
+                        student.bloodGroup,
+                        student.admissionNumber,
+                        student.admissionDate,
+                        student.bankNameAddress,
                         student.email,
                         student.birthday,
                         student.notes.replace(",", ";")
@@ -46,7 +58,7 @@ class ExportManager(private val context: Context) {
         y += 30f
         students.forEach { student ->
             canvas.drawText(
-                "${student.name} | Age ${student.age} | ${student.contact} | ${student.birthday}",
+                "${student.name} | Age ${student.age} | ${student.contact} | Parent ${student.parentContact} | ${student.admissionNumber} | ${student.birthday}",
                 40f,
                 y,
                 paint
