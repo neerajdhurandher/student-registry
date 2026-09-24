@@ -23,35 +23,45 @@ object WorkerScheduler {
         )
     }
 
-    fun scheduleCloudSync(context: Context, teacherId: String) {
+    fun scheduleCloudSync(context: Context, schoolId: String, teacherEmail: String) {
         val request = PeriodicWorkRequestBuilder<CloudSyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
-            .setInputData(workDataOf(CloudSyncWorker.TEACHER_ID_KEY to teacherId))
+            .setInputData(
+                workDataOf(
+                    CloudSyncWorker.SCHOOL_ID_KEY to schoolId,
+                    CloudSyncWorker.TEACHER_EMAIL_KEY to teacherEmail
+                )
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "cloud-sync-$teacherId",
+            "cloud-sync-$schoolId",
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
     }
 
-    fun triggerCloudSyncNow(context: Context, teacherId: String) {
+    fun triggerCloudSyncNow(context: Context, schoolId: String, teacherEmail: String) {
         val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
-            .setInputData(workDataOf(CloudSyncWorker.TEACHER_ID_KEY to teacherId))
+            .setInputData(
+                workDataOf(
+                    CloudSyncWorker.SCHOOL_ID_KEY to schoolId,
+                    CloudSyncWorker.TEACHER_EMAIL_KEY to teacherEmail
+                )
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
-            "cloud-sync-now-$teacherId",
+            "cloud-sync-now-$schoolId",
             ExistingWorkPolicy.REPLACE,
             request
         )

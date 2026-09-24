@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.studentregistry.data.SettingsRepository
+import com.studentregistry.data.SchoolEntity
+import com.studentregistry.data.SchoolRepository
 import com.studentregistry.data.StudentEntity
 import com.studentregistry.data.StudentRepository
 import com.studentregistry.export.ExportManager
@@ -196,18 +198,30 @@ data class StudentFormInput(
     val notes: String
 )
 
+data class SchoolAccessUiState(
+    val school: SchoolEntity? = null,
+    val loading: Boolean = false,
+    val requestNote: String = ""
+) {
+    val needsHelp: Boolean
+        get() = school == null && !loading
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(
     private val appContext: Context,
     private val studentRepository: StudentRepository,
+    private val schoolRepository: SchoolRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
     private val currentUser = MutableStateFlow<TeacherUser?>(null)
     private val searchQuery = MutableStateFlow("")
     private val ageFilter = MutableStateFlow(AgeFilter.ALL)
     private val _messages = MutableSharedFlow<String>()
+    private val schoolAccessUiState = MutableStateFlow(SchoolAccessUiState(loading = false))
 
     val user: StateFlow<TeacherUser?> = currentUser
+    val schoolAccessState: StateFlow<SchoolAccessUiState> = schoolAccessUiState
     val selectedAgeFilter: StateFlow<AgeFilter> = ageFilter
     val currentSearchQuery: StateFlow<String> = searchQuery
     val messages = _messages.asSharedFlow()
@@ -218,20 +232,39 @@ class MainViewModel(
         initialValue = UiSettings()
     )
 
+    val schools: StateFlow<List<SchoolEntity>> = schoolRepository.observeSchools().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    private data class StudentListScope(
+        val signedInUser: TeacherUser?,
+        val query: String,
+        val filter: AgeFilter,
+        val schoolId: String
+    )
+
     val students: StateFlow<List<StudentEntity>> = combine(
         currentUser,
         searchQuery,
-        ageFilter
-    ) { signedInUser, query, filter ->
-        Triple(signedInUser, query, filter)
-    }.flatMapLatest { (signedInUser, query, filter) ->
-        if (signedInUser == null) {
+        ageFilter,
+        settings
+    ) { signedInUser, query, filter, settings ->
+        StudentListScope(
+            signedInUser = signedInUser,
+            query = query,
+            filter = filter,
+            schoolId = settings.activeSchoolId
+        )
+    }.flatMapLatest { scope ->
+        if (scope.signedInUser == null || scope.schoolId.isBlank()) {
             flowOf(emptyList())
         } else {
             studentRepository.observeStudents(
-                teacherId = signedInUser.id,
-                query = query,
-                ageFilter = filter
+                schoolId = scope.schoolId,
+                query = scope.query,
+                ageFilter = scope.filter
             )
         }
     }.stateIn(
@@ -244,8 +277,20 @@ class MainViewModel(
         currentUser.value = user
         viewModelScope.launch {
             settingsRepository.setActiveTeacherId(user.id)
-            WorkerScheduler.scheduleCloudSync(appContext, user.id)
-            _messages.emit("Welcome ${user.name}")
+            schoolAccessUiState.value = SchoolAccessUiState(loading = true)
+            val school = schoolRepository.findSchoolForTeacher(user.email)
+            if (school != null) {
+                val syncedSchool = schoolRepository.syncSchoolFromFirestore(school.id) ?: school
+                schoolRepository.cacheSchool(syncedSchool)
+                settingsRepository.setActiveSchoolId(syncedSchool.id)
+                schoolAccessUiState.value = SchoolAccessUiState(school = syncedSchool)
+                WorkerScheduler.scheduleCloudSync(appContext, syncedSchool.id, user.email)
+                _messages.emit("Welcome ${user.name}")
+            } else {
+                settingsRepository.setActiveSchoolId("")
+                schoolAccessUiState.value = SchoolAccessUiState(school = null)
+                _messages.emit("Ask admin to add your email to a school.")
+            }
         }
     }
 
@@ -253,6 +298,8 @@ class MainViewModel(
         currentUser.value = null
         viewModelScope.launch {
             settingsRepository.setActiveTeacherId("")
+            settingsRepository.setActiveSchoolId("")
+            schoolAccessUiState.value = SchoolAccessUiState(loading = false)
         }
     }
 
@@ -264,10 +311,138 @@ class MainViewModel(
         ageFilter.value = filter
     }
 
-    fun saveStudent(input: StudentFormInput, studentId: String?) {
-        val signedInUser = currentUser.value
-        if (signedInUser == null) {
-            viewModelScope.launch { _messages.emit("Please sign in first.") }
+    fun updateSchoolRequestNote(note: String) {
+        schoolAccessUiState.value = schoolAccessUiState.value.copy(requestNote = note)
+    }
+
+    fun submitSchoolAccessRequest() {
+        val signedInUser = currentUser.value ?: return
+        val note = schoolAccessUiState.value.requestNote.trim()
+        if (note.isBlank()) {
+            viewModelScope.launch { _messages.emit("Please enter your details for the admin.") }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            schoolRepository.submitAccessRequest(signedInUser.email, signedInUser.name, note)
+            _messages.emit("Request sent to admin.")
+        }
+    }
+
+    fun createSchool(name: String, address: String, contactInformation: String, teacherEmails: List<String>) {
+        val normalizedName = name.trim()
+        if (normalizedName.length < 2) {
+            viewModelScope.launch { _messages.emit("Enter a valid school name.") }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val school = schoolRepository.createSchool(normalizedName, address, contactInformation, teacherEmails)
+                schoolAccessUiState.value = schoolAccessUiState.value.copy(school = school)
+                settingsRepository.setActiveSchoolId(school.id)
+            }.onSuccess {
+                _messages.emit("School created successfully.")
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to create school.")
+            }
+        }
+    }
+
+    fun addTeacherToSchool(schoolId: String, teacherEmail: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                schoolRepository.addTeacherToSchool(schoolId, teacherEmail)
+            }.onSuccess { updated ->
+                if (updated != null) {
+                    schoolAccessUiState.value = schoolAccessUiState.value.copy(school = updated)
+                    settingsRepository.setActiveSchoolId(updated.id)
+                    _messages.emit("Teacher added successfully.")
+                } else {
+                    _messages.emit("School not found.")
+                }
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to add teacher.")
+            }
+        }
+    }
+
+    fun updateSchool(schoolId: String, name: String, address: String, contactInformation: String) {
+        val normalizedName = name.trim()
+        if (normalizedName.length < 2) {
+            viewModelScope.launch { _messages.emit("Enter a valid school name.") }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                schoolRepository.updateSchool(schoolId, normalizedName, address, contactInformation)
+            }.onSuccess { updated ->
+                if (updated != null) {
+                    schoolAccessUiState.value = schoolAccessUiState.value.copy(school = updated)
+                    _messages.emit("School updated successfully.")
+                } else {
+                    _messages.emit("School not found.")
+                }
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to update school.")
+            }
+        }
+    }
+
+    fun setSchoolActive(schoolId: String, isActive: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                schoolRepository.setSchoolActive(schoolId, isActive)
+            }.onSuccess { updated ->
+                if (updated != null) {
+                    val currentAccessSchool = schoolAccessUiState.value.school
+                    if (currentAccessSchool?.id == updated.id) {
+                        schoolAccessUiState.value = schoolAccessUiState.value.copy(school = updated)
+                    }
+                    _messages.emit(if (isActive) "School activated successfully." else "School deactivated successfully.")
+                } else {
+                    _messages.emit("School not found.")
+                }
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to update school status.")
+            }
+        }
+    }
+
+    fun deleteSchool(schoolId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                schoolRepository.deleteSchool(schoolId)
+            }.onSuccess { deleted ->
+                if (deleted) {
+                    val activeSchoolId = settings.value.activeSchoolId
+                    if (activeSchoolId == schoolId) {
+                        settingsRepository.setActiveSchoolId("")
+                    }
+                    val currentAccessSchool = schoolAccessUiState.value.school
+                    if (currentAccessSchool?.id == schoolId) {
+                        schoolAccessUiState.value = schoolAccessUiState.value.copy(school = null)
+                    }
+                    _messages.emit("School deleted successfully.")
+                } else {
+                    _messages.emit("School not found.")
+                }
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to delete school.")
+            }
+        }
+    }
+
+    fun observeStudentsForSchool(schoolId: String) = studentRepository.observeStudentsForSchool(schoolId)
+
+    fun addStudentForSchool(schoolId: String, teacherEmail: String, input: StudentFormInput) {
+        val normalizedSchoolId = schoolId.trim()
+        val normalizedTeacherEmail = teacherEmail.trim().lowercase()
+        if (normalizedSchoolId.isBlank()) {
+            viewModelScope.launch { _messages.emit("School is not assigned yet.") }
+            return
+        }
+        if (normalizedTeacherEmail.isBlank()) {
+            viewModelScope.launch { _messages.emit("Select a teacher first.") }
             return
         }
 
@@ -281,8 +456,9 @@ class MainViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             val student = StudentEntity(
-                id = studentId ?: UUID.randomUUID().toString(),
-                teacherId = signedInUser.id,
+                id = UUID.randomUUID().toString(),
+                teacherId = normalizedTeacherEmail,
+                schoolId = normalizedSchoolId,
                 name = input.name.trim(),
                 age = parsedAge,
                 contact = input.contact.trim(),
@@ -306,7 +482,61 @@ class MainViewModel(
             )
             studentRepository.saveStudent(student)
             if (settings.value.cloudSyncEnabled) {
-                WorkerScheduler.triggerCloudSyncNow(appContext, signedInUser.id)
+                WorkerScheduler.triggerCloudSyncNow(appContext, normalizedSchoolId, normalizedTeacherEmail)
+            }
+            _messages.emit("Student added successfully.")
+        }
+    }
+
+    fun saveStudent(input: StudentFormInput, studentId: String?) {
+        val signedInUser = currentUser.value
+        if (signedInUser == null) {
+            viewModelScope.launch { _messages.emit("Please sign in first.") }
+            return
+        }
+        val schoolId = settings.value.activeSchoolId
+        if (schoolId.isBlank()) {
+            viewModelScope.launch { _messages.emit("School is not assigned yet.") }
+            return
+        }
+
+        val validation = validateStudentForm(input)
+        if (validation.hasErrors) {
+            viewModelScope.launch { _messages.emit(validation.firstMessage() ?: "Please correct the form errors.") }
+            return
+        }
+
+        val parsedAge = input.age.trim().toInt()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val student = StudentEntity(
+                id = studentId ?: UUID.randomUUID().toString(),
+                teacherId = signedInUser.id,
+                schoolId = schoolId,
+                name = input.name.trim(),
+                age = parsedAge,
+                contact = input.contact.trim(),
+                parentContact = input.parentContact.trim(),
+                aadhaarNumber = input.aadhaarNumber.trim(),
+                apparId = input.apparId.trim(),
+                penId = input.penId.trim(),
+                fatherName = input.fatherName.trim(),
+                motherName = input.motherName.trim(),
+                religion = input.religion.trim(),
+                caste = input.caste.trim(),
+                bloodGroup = input.bloodGroup.trim(),
+                admissionNumber = input.admissionNumber.trim(),
+                admissionDate = input.admissionDate.trim(),
+                bankNameAddress = input.bankNameAddress.trim(),
+                email = input.email.trim(),
+                birthday = input.birthday.trim(),
+                notes = input.notes.trim(),
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
+            )
+            studentRepository.saveStudent(student)
+            if (settings.value.cloudSyncEnabled) {
+                WorkerScheduler.triggerCloudSyncNow(appContext, schoolId, signedInUser.email)
             }
             _messages.emit("Student saved.")
         }
@@ -316,7 +546,7 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             studentRepository.deleteStudent(student)
             if (settings.value.cloudSyncEnabled) {
-                WorkerScheduler.triggerCloudSyncNow(appContext, student.teacherId)
+                WorkerScheduler.triggerCloudSyncNow(appContext, student.schoolId, student.teacherId)
             }
             _messages.emit("Student deleted.")
         }
@@ -374,12 +604,13 @@ class MainViewModel(
 class MainViewModelFactory(
     private val appContext: Context,
     private val studentRepository: StudentRepository,
+    private val schoolRepository: SchoolRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(appContext, studentRepository, settingsRepository) as T
+            return MainViewModel(appContext, studentRepository, schoolRepository, settingsRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

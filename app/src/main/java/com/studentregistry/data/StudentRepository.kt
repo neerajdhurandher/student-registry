@@ -5,19 +5,21 @@ import kotlinx.coroutines.flow.Flow
 
 class StudentRepository(private val studentDao: StudentDao) {
     fun observeStudents(
-        teacherId: String,
+        schoolId: String,
         query: String,
         ageFilter: AgeFilter
     ): Flow<List<StudentEntity>> {
         val pattern = "%${query.trim()}%"
         return studentDao.observeStudents(
-            teacherId = teacherId,
+            schoolId = schoolId,
             searchPattern = pattern,
             ageFilter = ageFilter.name
         )
     }
 
     suspend fun getStudent(studentId: String): StudentEntity? = studentDao.getById(studentId)
+
+    fun observeStudentsForSchool(schoolId: String): Flow<List<StudentEntity>> = studentDao.observeBySchool(schoolId)
 
     suspend fun saveStudent(student: StudentEntity) {
         studentDao.upsert(student)
@@ -27,12 +29,12 @@ class StudentRepository(private val studentDao: StudentDao) {
         studentDao.delete(student)
     }
 
-    suspend fun getTeacherStudents(teacherId: String): List<StudentEntity> {
-        return studentDao.getAllForTeacher(teacherId)
+    suspend fun getSchoolStudents(schoolId: String): List<StudentEntity> {
+        return studentDao.getAllForSchool(schoolId)
     }
 
-    suspend fun markTeacherSynced(teacherId: String) {
-        studentDao.markSynced(teacherId)
+    suspend fun markSchoolSynced(schoolId: String) {
+        studentDao.markSynced(schoolId)
     }
 
     suspend fun getTodaysBirthdays(monthDay: String): List<StudentEntity> {

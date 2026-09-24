@@ -20,6 +20,7 @@ class SettingsRepository(private val context: Context) {
         val notifications: Preferences.Key<Boolean> = booleanPreferencesKey("notifications")
         val cloudSync: Preferences.Key<Boolean> = booleanPreferencesKey("cloud_sync")
         val activeTeacher: Preferences.Key<String> = stringPreferencesKey("active_teacher")
+        val activeSchool: Preferences.Key<String> = stringPreferencesKey("active_school")
     }
 
     val settings: Flow<UiSettings> = context.settingsDataStore.data.map { prefs ->
@@ -28,7 +29,8 @@ class SettingsRepository(private val context: Context) {
             fontScale = prefs[Keys.fontScale] ?: 1f,
             notificationsEnabled = prefs[Keys.notifications] ?: true,
             cloudSyncEnabled = prefs[Keys.cloudSync] ?: true,
-            activeTeacherId = prefs[Keys.activeTeacher] ?: ""
+            activeTeacherId = prefs[Keys.activeTeacher] ?: "",
+            activeSchoolId = prefs[Keys.activeSchool] ?: ""
         )
     }
 
@@ -50,5 +52,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setActiveTeacherId(teacherId: String) {
         context.settingsDataStore.edit { it[Keys.activeTeacher] = teacherId }
+    }
+
+    suspend fun setActiveSchoolId(schoolId: String) {
+        context.settingsDataStore.edit { it[Keys.activeSchool] = schoolId }
     }
 }

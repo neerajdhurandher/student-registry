@@ -12,23 +12,26 @@ class CloudSyncWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val teacherId = inputData.getString(TEACHER_ID_KEY).orEmpty()
-        if (teacherId.isBlank()) {
+        val schoolId = inputData.getString(SCHOOL_ID_KEY).orEmpty()
+        val teacherEmail = inputData.getString(TEACHER_EMAIL_KEY).orEmpty()
+        if (schoolId.isBlank() || teacherEmail.isBlank()) {
             return Result.success()
         }
 
         val database = AppDatabase.getInstance(applicationContext)
         val repository = StudentRepository(database.studentDao())
         val syncService = CloudSyncService(applicationContext)
-        val students = repository.getTeacherStudents(teacherId)
-        val synced = syncService.syncStudents(teacherId, students)
+        val school = database.schoolDao().getById(schoolId) ?: return Result.success()
+        val students = repository.getSchoolStudents(schoolId)
+        val synced = syncService.syncSchool(teacherEmail, school, students)
         if (synced) {
-            repository.markTeacherSynced(teacherId)
+            repository.markSchoolSynced(schoolId)
         }
         return Result.success()
     }
 
     companion object {
-        const val TEACHER_ID_KEY: String = "teacher_id"
+        const val SCHOOL_ID_KEY: String = "school_id"
+        const val TEACHER_EMAIL_KEY: String = "teacher_email"
     }
 }

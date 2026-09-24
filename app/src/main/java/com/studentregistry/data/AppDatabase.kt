@@ -7,8 +7,9 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [StudentEntity::class], version = 3, exportSchema = false)
+@Database(entities = [SchoolEntity::class, StudentEntity::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun schoolDao(): SchoolDao
     abstract fun studentDao(): StudentDao
 
     companion object {
@@ -38,13 +39,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS schools (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        address TEXT NOT NULL DEFAULT '',
+                        contactInformation TEXT NOT NULL DEFAULT '',
+                        teacherEmailsCsv TEXT NOT NULL DEFAULT '',
+                        studentIdsCsv TEXT NOT NULL DEFAULT '',
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("ALTER TABLE students ADD COLUMN schoolId TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE schools ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "student_registry.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
         }
     }

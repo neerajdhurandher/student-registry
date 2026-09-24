@@ -2,8 +2,10 @@ package com.studentregistry.sync
 
 import android.content.Context
 import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.studentregistry.data.SchoolEntity
 import com.studentregistry.data.StudentEntity
 import kotlinx.coroutines.tasks.await
 
@@ -12,28 +14,39 @@ class CloudSyncService(private val context: Context) {
 
     private fun hasFirebaseConfig(): Boolean = FirebaseApp.getApps(context).isNotEmpty()
 
-    suspend fun syncStudents(teacherId: String, students: List<StudentEntity>): Boolean {
-        if (!hasFirebaseConfig()) {
-            return false
+    suspend fun syncSchool(teacherEmail: String, school: SchoolEntity, students: List<StudentEntity>): Boolean {
+        if (!hasFirebaseConfig()) return false
+
+        val schoolRef = firestore.collection("schools").document(school.id)
+        val remoteSnapshot = schoolRef.get().await()
+        if (!remoteSnapshot.exists()) {
+            schoolRef.set(
+                mapOf(
+                    "name" to school.name,
+                    "address" to school.address,
+                    "contactInformation" to school.contactInformation
+                ),
+                SetOptions.merge()
+            ).await()
         }
 
-        val collection = firestore
-            .collection("teachers")
-            .document(teacherId)
-            .collection("students")
+        val remoteStudents = firestore.collection("students")
+            .whereEqualTo("schoolId", school.id)
+            .get()
+            .await()
 
-        val remoteStudents = collection.get().await()
         val localIds = students.map { it.id }.toSet()
         for (document in remoteStudents.documents) {
             if (document.id !in localIds) {
-                collection.document(document.id).delete().await()
+                firestore.collection("students").document(document.id).delete().await()
             }
         }
 
         for (student in students) {
             val payload: Map<String, Any> = mapOf(
                 "id" to student.id,
-                "teacherId" to student.teacherId,
+                "teacherId" to teacherEmail,
+                "schoolId" to school.id,
                 "name" to student.name,
                 "age" to student.age,
                 "contact" to student.contact,
@@ -54,8 +67,17 @@ class CloudSyncService(private val context: Context) {
                 "notes" to student.notes,
                 "updatedAt" to student.updatedAt
             )
-            collection.document(student.id).set(payload, SetOptions.merge()).await()
+            firestore.collection("students").document(student.id).set(payload, SetOptions.merge()).await()
         }
+
+        schoolRef.set(
+            mapOf(
+                "teachers" to FieldValue.arrayUnion(teacherEmail),
+                "students" to students.map { it.id }
+            ),
+            SetOptions.merge()
+        ).await()
+
         return true
     }
 }

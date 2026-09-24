@@ -5,5 +5,6 @@ data class UiSettings(
     val fontScale: Float = 1f,
     val notificationsEnabled: Boolean = true,
     val cloudSyncEnabled: Boolean = true,
-    val activeTeacherId: String = ""
+    val activeTeacherId: String = "",
+    val activeSchoolId: String = ""
 )
