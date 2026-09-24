@@ -13,7 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,13 +37,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContactPhone
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Lock
@@ -360,6 +366,13 @@ private fun StudentRegistryNavGraph(
                 onFilterChange = viewModel::updateAgeFilter,
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenExport = { navController.navigate(Routes.EXPORT) },
+                onExportSelectedCsv = { selectedStudents ->
+                    viewModel.exportCsv(exportManager, selectedStudents)
+                },
+                onExportSelectedPdf = { selectedStudents ->
+                    viewModel.exportPdf(exportManager, selectedStudents)
+                },
+                onDeleteSelected = viewModel::deleteStudents,
                 onAddStudent = { navController.navigate("add-edit?studentId=") },
                 onOpenStudent = { studentId -> navController.navigate("student-detail/$studentId") }
             )
@@ -835,7 +848,7 @@ private fun formatBirthdayBadge(birthday: String): String? {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun StudentListScreen(
     teacherName: String,
@@ -846,6 +859,9 @@ private fun StudentListScreen(
     onFilterChange: (AgeFilter) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenExport: () -> Unit,
+    onExportSelectedCsv: (List<StudentEntity>) -> Unit,
+    onExportSelectedPdf: (List<StudentEntity>) -> Unit,
+    onDeleteSelected: (List<StudentEntity>) -> Unit,
     onAddStudent: () -> Unit,
     onOpenStudent: (String) -> Unit
 ) {
@@ -857,6 +873,26 @@ private fun StudentListScreen(
     val primaryTint = colorScheme.primary.copy(alpha = 0.14f)
     val titleColor = colorScheme.onSurface
     val secondaryTextColor = colorScheme.onSurfaceVariant
+    var selectedStudentIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var showExportOptions by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    val selectionMode = selectedStudentIds.isNotEmpty()
+    val selectedStudents = remember(students, selectedStudentIds) {
+        students.filter { it.id in selectedStudentIds }
+    }
+
+    LaunchedEffect(students) {
+        val visibleIds = students.map { it.id }.toSet()
+        selectedStudentIds = selectedStudentIds.filter { it in visibleIds }
+    }
+
+    fun toggleSelection(studentId: String) {
+        selectedStudentIds = if (studentId in selectedStudentIds) {
+            selectedStudentIds - studentId
+        } else {
+            selectedStudentIds + studentId
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Surface(
@@ -874,12 +910,12 @@ private fun StudentListScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Student Registry",
+                        text = if (selectionMode) "${selectedStudentIds.size} selected" else "Student Registry",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = titleColor
                     )
-                    if (teacherName.isNotBlank()) {
+                    if (!selectionMode && teacherName.isNotBlank()) {
                         Text(
                             text = teacherName,
                             style = MaterialTheme.typography.labelSmall,
@@ -888,19 +924,47 @@ private fun StudentListScreen(
                     }
                 }
                 Row {
-                    IconButton(onClick = onOpenExport) {
-                        Icon(
-                            imageVector = Icons.Default.FileDownload,
-                            contentDescription = "Export",
-                            tint = secondaryTextColor
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = secondaryTextColor
-                        )
+                    if (selectionMode) {
+                        IconButton(onClick = { showExportOptions = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FileDownload,
+                                contentDescription = "Export selected students",
+                                tint = secondaryTextColor
+                            )
+                        }
+                        IconButton(onClick = { confirmDelete = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete selected students",
+                                tint = colorScheme.error
+                            )
+                        }
+                        IconButton(onClick = {
+                            selectedStudentIds = emptyList()
+                            showExportOptions = false
+                            confirmDelete = false
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Clear selection",
+                                tint = secondaryTextColor
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onOpenExport) {
+                            Icon(
+                                imageVector = Icons.Default.FileDownload,
+                                contentDescription = "Export",
+                                tint = secondaryTextColor
+                            )
+                        }
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = secondaryTextColor
+                            )
+                        }
                     }
                 }
             }
@@ -1032,10 +1096,22 @@ private fun StudentListScreen(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onOpenStudent(student.id) },
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (selectionMode) {
+                                                toggleSelection(student.id)
+                                            } else {
+                                                onOpenStudent(student.id)
+                                            }
+                                        },
+                                        onLongClick = { toggleSelection(student.id) }
+                                    ),
                                 shape = RoundedCornerShape(16.dp),
-                                color = cardColor,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, outlineColor)
+                                color = if (student.id in selectedStudentIds) elevatedCardColor else cardColor,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (student.id in selectedStudentIds) colorScheme.primary else outlineColor
+                                )
                             ) {
                                 Row(
                                     modifier = Modifier.padding(14.dp),
@@ -1113,12 +1189,21 @@ private fun StudentListScreen(
                                             }
                                         }
                                     }
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = null,
-                                        tint = secondaryTextColor,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
+                                    if (student.id in selectedStudentIds) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = colorScheme.primary,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    } else if (!selectionMode) {
+                                        Icon(
+                                            imageVector = Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = secondaryTextColor,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1128,17 +1213,79 @@ private fun StudentListScreen(
         }
     }
 
-        FloatingActionButton(
-            onClick = onAddStudent,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp),
-            containerColor = colorScheme.primary,
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add student")
+        if (!selectionMode) {
+            FloatingActionButton(
+                onClick = onAddStudent,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp),
+                containerColor = colorScheme.primary,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add student")
+            }
         }
+    }
+
+    if (showExportOptions && selectedStudents.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showExportOptions = false },
+            title = { Text("Export selected students") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Export ${selectedStudents.size} selected students.")
+                    Button(
+                        onClick = {
+                            onExportSelectedCsv(selectedStudents)
+                            showExportOptions = false
+                            selectedStudentIds = emptyList()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Export CSV")
+                    }
+                    Button(
+                        onClick = {
+                            onExportSelectedPdf(selectedStudents)
+                            showExportOptions = false
+                            selectedStudentIds = emptyList()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Export PDF")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportOptions = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (confirmDelete && selectedStudents.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete selected students") },
+            text = { Text("Delete ${selectedStudents.size} selected students? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteSelected(selectedStudents)
+                    confirmDelete = false
+                    selectedStudentIds = emptyList()
+                }) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

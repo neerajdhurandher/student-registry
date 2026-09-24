@@ -40,3 +40,40 @@ APP Flow:
 5. **Delete Student**: Teacher can delete a student from the Student Detail screen.(ask for confirmation before deletion)
 6. **Export Data**: Teacher can export student details from the Student List screen based on current filtered data to CSV or PDF.
 
+
+### Data Management:
+#### Recommended Firestore structure
+
+#### Docs
+
+`schools/{schoolId}
+students/{studentId}
+teachers/{teacherId}
+`
+
+#### School doc
+
+`{
+"name": "ABC School",
+"address": "...",
+"contactInfo": "...",
+"createdAt": 1234567890
+}`
+
+#### Teacher doc
+
+`{
+"schoolId": "school-uuid",
+"email": "teacher@example.com",
+"name": "Ms. Verma"
+}`
+
+#### Student doc
+
+`{
+"schoolId": "school-uuid",
+"name": "Rahul",
+"age": 12,
+"teacherId": "teacher-email",
+...
+}`

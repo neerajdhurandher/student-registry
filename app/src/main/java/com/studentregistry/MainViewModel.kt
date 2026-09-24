@@ -552,30 +552,52 @@ class MainViewModel(
         }
     }
 
+    fun deleteStudents(selectedStudents: List<StudentEntity>) {
+        if (selectedStudents.isEmpty()) {
+            postMessage("No students selected.")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            selectedStudents.forEach { studentRepository.deleteStudent(it) }
+            if (settings.value.cloudSyncEnabled) {
+                val schoolId = selectedStudents.first().schoolId
+                val teacherEmail = currentUser.value?.email ?: selectedStudents.first().teacherId
+                WorkerScheduler.triggerCloudSyncNow(appContext, schoolId, teacherEmail)
+            }
+            _messages.emit("${selectedStudents.size} students deleted.")
+        }
+    }
+
     suspend fun getStudent(studentId: String): StudentEntity? {
         return studentRepository.getStudent(studentId)
     }
 
     fun exportCsv(exportManager: ExportManager) {
+        exportCsv(exportManager, students.value)
+    }
+
+    fun exportCsv(exportManager: ExportManager, selectedStudents: List<StudentEntity>) {
         viewModelScope.launch(Dispatchers.IO) {
-            val list = students.value
-            if (list.isEmpty()) {
+            if (selectedStudents.isEmpty()) {
                 _messages.emit("No students to export.")
                 return@launch
             }
-            val file = exportManager.exportCsv(list)
+            val file = exportManager.exportCsv(selectedStudents)
             _messages.emit("CSV exported to ${file.absolutePath}")
         }
     }
 
     fun exportPdf(exportManager: ExportManager) {
+        exportPdf(exportManager, students.value)
+    }
+
+    fun exportPdf(exportManager: ExportManager, selectedStudents: List<StudentEntity>) {
         viewModelScope.launch(Dispatchers.IO) {
-            val list = students.value
-            if (list.isEmpty()) {
+            if (selectedStudents.isEmpty()) {
                 _messages.emit("No students to export.")
                 return@launch
             }
-            val file = exportManager.exportPdf(list)
+            val file = exportManager.exportPdf(selectedStudents)
             _messages.emit("PDF exported to ${file.absolutePath}")
         }
     }
