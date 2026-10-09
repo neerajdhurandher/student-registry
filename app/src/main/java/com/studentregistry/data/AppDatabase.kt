@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [SchoolEntity::class, StudentEntity::class], version = 5, exportSchema = false)
+@Database(entities = [SchoolEntity::class, StudentEntity::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun schoolDao(): SchoolDao
     abstract fun studentDao(): StudentDao
@@ -64,13 +64,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE students ADD COLUMN fatherPhone TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE students ADD COLUMN motherPhone TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE students SET fatherPhone = parentContact WHERE fatherPhone = '' AND parentContact != ''")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "student_registry.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
         }
     }

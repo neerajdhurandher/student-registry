@@ -11,8 +11,8 @@ import com.studentregistry.data.SchoolRepository
 import com.studentregistry.data.StudentEntity
 import com.studentregistry.data.StudentRepository
 import com.studentregistry.export.ExportManager
-import com.studentregistry.model.AgeFilter
 import com.studentregistry.model.TeacherUser
+import com.studentregistry.model.StudentListSort
 import com.studentregistry.model.UiSettings
 import com.studentregistry.sync.WorkerScheduler
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +33,8 @@ data class StudentFormErrors(
     val name: String? = null,
     val age: String? = null,
     val contact: String? = null,
-    val parentContact: String? = null,
+    val fatherPhone: String? = null,
+    val motherPhone: String? = null,
     val aadhaarNumber: String? = null,
     val apparId: String? = null,
     val penId: String? = null,
@@ -54,7 +55,8 @@ data class StudentFormErrors(
             name,
             age,
             contact,
-            parentContact,
+            fatherPhone,
+            motherPhone,
             aadhaarNumber,
             apparId,
             penId,
@@ -75,7 +77,8 @@ data class StudentFormErrors(
         name,
         age,
         contact,
-        parentContact,
+        fatherPhone,
+        motherPhone,
         aadhaarNumber,
         apparId,
         penId,
@@ -93,6 +96,24 @@ data class StudentFormErrors(
     ).firstOrNull { it != null }
 }
 
+private fun sortStudents(
+    students: List<StudentEntity>,
+    sort: StudentListSort
+): List<StudentEntity> {
+    return when (sort) {
+        StudentListSort.ALL,
+        StudentListSort.NAME_ASC -> students.sortedBy { it.name.trim().lowercase() }
+        StudentListSort.NAME_DESC -> students.sortedByDescending { it.name.trim().lowercase() }
+        StudentListSort.ADDED_DATE -> students.sortedByDescending { it.updatedAt }
+        StudentListSort.ADMISSION_NUMBER -> students.sortedWith(
+            compareBy<StudentEntity> { it.admissionNumber.isBlank() }
+                .thenBy { it.admissionNumber.toLongOrNull() ?: Long.MAX_VALUE }
+                .thenBy { it.admissionNumber.trim().lowercase() }
+                .thenBy { it.name.trim().lowercase() }
+        )
+    }
+}
+
 private val validBloodGroups = setOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 
 private fun isValidIsoDate(value: String): Boolean = runCatching {
@@ -101,7 +122,7 @@ private fun isValidIsoDate(value: String): Boolean = runCatching {
 
 private fun hasValidPhoneDigits(value: String): Boolean {
     val digits = value.filter(Char::isDigit)
-    return digits.length in 10..15
+    return digits.length == 10
 }
 
 private fun validateOptionalName(value: String, label: String): String? {
@@ -114,7 +135,8 @@ fun validateStudentForm(input: StudentFormInput): StudentFormErrors {
     val trimmedName = input.name.trim()
     val ageValue = input.age.trim().toIntOrNull()
     val trimmedContact = input.contact.trim()
-    val trimmedParentContact = input.parentContact.trim()
+    val trimmedFatherPhone = input.fatherPhone.trim()
+    val trimmedMotherPhone = input.motherPhone.trim()
     val trimmedAadhaar = input.aadhaarNumber.filter(Char::isDigit)
     val trimmedApparId = input.apparId.filter(Char::isDigit)
     val trimmedPenId = input.penId.filter(Char::isDigit)
@@ -139,8 +161,11 @@ fun validateStudentForm(input: StudentFormInput): StudentFormErrors {
         contact = if (trimmedContact.isNotBlank() && !hasValidPhoneDigits(trimmedContact)) {
             "Enter a valid 10 digit student contact number."
         } else null,
-        parentContact = if (trimmedParentContact.isNotBlank() && !hasValidPhoneDigits(trimmedParentContact)) {
-            "Enter a valid 10 digit parent contact number."
+        fatherPhone = if (trimmedFatherPhone.isNotBlank() && !hasValidPhoneDigits(trimmedFatherPhone)) {
+            "Enter a valid 10 digit father's phone number."
+        } else null,
+        motherPhone = if (trimmedMotherPhone.isNotBlank() && !hasValidPhoneDigits(trimmedMotherPhone)) {
+            "Enter a valid 10 digit mother's phone number."
         } else null,
         aadhaarNumber = if (input.aadhaarNumber.isNotBlank() && trimmedAadhaar.length != 12) {
             "Aadhaar number must be exactly 12 digits."
@@ -181,7 +206,8 @@ data class StudentFormInput(
     val name: String,
     val age: String,
     val contact: String,
-    val parentContact: String,
+    val fatherPhone: String,
+    val motherPhone: String,
     val aadhaarNumber: String,
     val apparId: String,
     val penId: String,
@@ -216,15 +242,17 @@ class MainViewModel(
 ) : ViewModel() {
     private val currentUser = MutableStateFlow<TeacherUser?>(null)
     private val searchQuery = MutableStateFlow("")
-    private val ageFilter = MutableStateFlow(AgeFilter.ALL)
+    private val studentListSort = MutableStateFlow(StudentListSort.ALL)
     private val _messages = MutableSharedFlow<String>()
     private val schoolAccessUiState = MutableStateFlow(SchoolAccessUiState(loading = false))
+    private val sessionBootstrapComplete = MutableStateFlow(false)
 
     val user: StateFlow<TeacherUser?> = currentUser
     val schoolAccessState: StateFlow<SchoolAccessUiState> = schoolAccessUiState
-    val selectedAgeFilter: StateFlow<AgeFilter> = ageFilter
+    val selectedStudentListSort: StateFlow<StudentListSort> = studentListSort
     val currentSearchQuery: StateFlow<String> = searchQuery
     val messages = _messages.asSharedFlow()
+    val isSessionBootstrapComplete: StateFlow<Boolean> = sessionBootstrapComplete
 
     val settings: StateFlow<UiSettings> = settingsRepository.settings.stateIn(
         scope = viewModelScope,
@@ -241,20 +269,20 @@ class MainViewModel(
     private data class StudentListScope(
         val signedInUser: TeacherUser?,
         val query: String,
-        val filter: AgeFilter,
+        val sort: StudentListSort,
         val schoolId: String
     )
 
     val students: StateFlow<List<StudentEntity>> = combine(
         currentUser,
         searchQuery,
-        ageFilter,
+        studentListSort,
         settings
-    ) { signedInUser, query, filter, settings ->
+    ) { signedInUser, query, sort, settings ->
         StudentListScope(
             signedInUser = signedInUser,
             query = query,
-            filter = filter,
+            sort = sort,
             schoolId = settings.activeSchoolId
         )
     }.flatMapLatest { scope ->
@@ -263,21 +291,43 @@ class MainViewModel(
         } else {
             studentRepository.observeStudents(
                 schoolId = scope.schoolId,
-                query = scope.query,
-                ageFilter = scope.filter
+                query = scope.query
             )
         }
+    }.combine(studentListSort) { students, sort ->
+        sortStudents(students, sort)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )
 
+    fun initializeSession(lastSignedInUser: TeacherUser?) {
+        if (lastSignedInUser == null) {
+            currentUser.value = null
+            schoolAccessUiState.value = SchoolAccessUiState(loading = false)
+            sessionBootstrapComplete.value = true
+            return
+        }
+        setSignedInUser(lastSignedInUser, showWelcomeMessage = false, isBootstrap = true)
+    }
+
     fun setSignedInUser(user: TeacherUser) {
+        setSignedInUser(user, showWelcomeMessage = true, isBootstrap = false)
+    }
+
+    private fun setSignedInUser(
+        user: TeacherUser,
+        showWelcomeMessage: Boolean,
+        isBootstrap: Boolean
+    ) {
         currentUser.value = user
+        schoolAccessUiState.value = SchoolAccessUiState(loading = true)
+        if (isBootstrap) {
+            sessionBootstrapComplete.value = false
+        }
         viewModelScope.launch {
             settingsRepository.setActiveTeacherId(user.id)
-            schoolAccessUiState.value = SchoolAccessUiState(loading = true)
             val school = schoolRepository.findSchoolForTeacher(user.email)
             if (school != null) {
                 val syncedSchool = schoolRepository.syncSchoolFromFirestore(school.id) ?: school
@@ -285,12 +335,15 @@ class MainViewModel(
                 settingsRepository.setActiveSchoolId(syncedSchool.id)
                 schoolAccessUiState.value = SchoolAccessUiState(school = syncedSchool)
                 WorkerScheduler.scheduleCloudSync(appContext, syncedSchool.id, user.email)
-                _messages.emit("Welcome ${user.name}")
+                if (showWelcomeMessage) {
+                    _messages.emit("Welcome ${user.name}")
+                }
             } else {
                 settingsRepository.setActiveSchoolId("")
                 schoolAccessUiState.value = SchoolAccessUiState(school = null)
                 _messages.emit("Ask admin to add your email to a school.")
             }
+            sessionBootstrapComplete.value = true
         }
     }
 
@@ -300,6 +353,7 @@ class MainViewModel(
             settingsRepository.setActiveTeacherId("")
             settingsRepository.setActiveSchoolId("")
             schoolAccessUiState.value = SchoolAccessUiState(loading = false)
+            sessionBootstrapComplete.value = true
         }
     }
 
@@ -307,8 +361,8 @@ class MainViewModel(
         searchQuery.value = query
     }
 
-    fun updateAgeFilter(filter: AgeFilter) {
-        ageFilter.value = filter
+    fun updateStudentListSort(sort: StudentListSort) {
+        studentListSort.value = sort
     }
 
     fun updateSchoolRequestNote(note: String) {
@@ -462,7 +516,8 @@ class MainViewModel(
                 name = input.name.trim(),
                 age = parsedAge,
                 contact = input.contact.trim(),
-                parentContact = input.parentContact.trim(),
+                fatherPhone = input.fatherPhone.trim(),
+                motherPhone = input.motherPhone.trim(),
                 aadhaarNumber = input.aadhaarNumber.trim(),
                 apparId = input.apparId.trim(),
                 penId = input.penId.trim(),
@@ -516,7 +571,8 @@ class MainViewModel(
                 name = input.name.trim(),
                 age = parsedAge,
                 contact = input.contact.trim(),
-                parentContact = input.parentContact.trim(),
+                fatherPhone = input.fatherPhone.trim(),
+                motherPhone = input.motherPhone.trim(),
                 aadhaarNumber = input.aadhaarNumber.trim(),
                 apparId = input.apparId.trim(),
                 penId = input.penId.trim(),

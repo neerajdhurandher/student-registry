@@ -1,19 +1,16 @@
 package com.studentregistry.data
 
-import com.studentregistry.model.AgeFilter
 import kotlinx.coroutines.flow.Flow
 
 class StudentRepository(private val studentDao: StudentDao) {
     fun observeStudents(
         schoolId: String,
-        query: String,
-        ageFilter: AgeFilter
+        query: String
     ): Flow<List<StudentEntity>> {
         val pattern = "%${query.trim()}%"
         return studentDao.observeStudents(
             schoolId = schoolId,
-            searchPattern = pattern,
-            ageFilter = ageFilter.name
+            searchPattern = pattern
         )
     }
 

@@ -224,7 +224,9 @@ class SchoolRepository(
             name = name,
             age = (getLong("age") ?: 0L).toInt(),
             contact = getString("contact").orEmpty(),
-            parentContact = getString("parentContact").orEmpty(),
+            fatherPhone = getString("fatherPhone")?.takeIf { it.isNotBlank() }
+                ?: getString("parentContact").orEmpty(),
+            motherPhone = getString("motherPhone").orEmpty(),
             aadhaarNumber = getString("aadhaarNumber").orEmpty(),
             apparId = getString("apparId").orEmpty(),
             penId = getString("penId").orEmpty(),

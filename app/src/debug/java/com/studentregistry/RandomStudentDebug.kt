@@ -74,14 +74,16 @@ private fun generateRandomStudentInput(): StudentFormInput {
         .minusDays(random.nextInt(10, 240).toLong())
         .toString()
     val studentNumber = buildPhoneNumber(random)
-    val parentNumber = buildPhoneNumber(random)
+    val fatherNumber = buildPhoneNumber(random)
+    val motherNumber = buildPhoneNumber(random)
     val emailHandle = "${firstName.lowercase()}.${lastName.lowercase()}${random.nextInt(10, 99)}"
 
     return StudentFormInput(
         name = studentName,
         age = calculateDebugAgeFromBirthday(birthday),
         contact = studentNumber,
-        parentContact = parentNumber,
+        fatherPhone = fatherNumber,
+        motherPhone = motherNumber,
         aadhaarNumber = buildDigits(random, 12),
         apparId = buildDigits(random, 12),
         penId = buildDigits(random, 11),

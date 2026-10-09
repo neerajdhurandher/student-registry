@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.studentregistry.data.StudentEntity
@@ -268,17 +269,45 @@ fun StudentDetailScreen(
                     supporting = null
                 )
                 StudentInfoItem(
+                    label = "Father's Phone Number",
+                    value = detailValueOrFallback(student.fatherPhone, "No father's number added"),
+                    supporting = null,
+                    trailingActions = {
+                        if (student.fatherPhone.isNotBlank()) {
+                            StudentActionIcon(
+                                icon = Icons.Default.Phone,
+                                contentDescription = "Call father",
+                                onClick = { openDialer(context, student.fatherPhone) }
+                            )
+                            StudentWhatsAppActionIcon(
+                                contentDescription = "Message father on WhatsApp",
+                                onClick = { openWhatsApp(context, student.fatherPhone) }
+                            )
+                        }
+                    }
+                )
+                StudentInfoItem(
                     label = "Mother's Name",
                     value = detailValueOrFallback(student.motherName, "Not added"),
                     supporting = null
                 )
                 StudentInfoItem(
-                    label = "Parent Contact Phone",
-                    value = detailValueOrFallback(student.parentContact, "No parent number added"),
-                    supporting = buildString {
-                        val names = listOf(student.fatherName, student.motherName).filter { it.isNotBlank() }
-                        if (names.isNotEmpty()) append(names.joinToString(" / ", prefix = "(" , postfix = ")"))
-                    }.ifBlank { null }
+                    label = "Mother's Phone Number",
+                    value = detailValueOrFallback(student.motherPhone, "No mother's number added"),
+                    supporting = null,
+                    trailingActions = {
+                        if (student.motherPhone.isNotBlank()) {
+                            StudentActionIcon(
+                                icon = Icons.Default.Phone,
+                                contentDescription = "Call mother",
+                                onClick = { openDialer(context, student.motherPhone) }
+                            )
+                            StudentWhatsAppActionIcon(
+                                contentDescription = "Message mother on WhatsApp",
+                                onClick = { openWhatsApp(context, student.motherPhone) }
+                            )
+                        }
+                    }
                 )
             }
 
@@ -621,20 +650,12 @@ private fun StudentWhatsAppActionIcon(
     onClick: () -> Unit
 ) {
     IconButton(onClick = onClick) {
-        Surface(
+        Icon(
+            painter = painterResource(id = R.drawable.ic_whatsapp),
+            contentDescription = contentDescription,
             modifier = Modifier.size(24.dp),
-            shape = CircleShape,
-            color = Color(0xFF25D366)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "WA",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
+            tint = Color.Unspecified
+        )
     }
 }
 
@@ -714,8 +735,11 @@ private fun shareStudentDetails(context: Context, student: StudentEntity) {
         if (student.contact.isNotBlank()) {
             appendLine("Contact: ${student.contact}")
         }
-        if (student.parentContact.isNotBlank()) {
-            appendLine("Parent Contact: ${student.parentContact}")
+        if (student.fatherPhone.isNotBlank()) {
+            appendLine("Father Phone: ${student.fatherPhone}")
+        }
+        if (student.motherPhone.isNotBlank()) {
+            appendLine("Mother Phone: ${student.motherPhone}")
         }
         if (student.caste.isNotBlank()) {
             appendLine("Caste: ${student.caste}")

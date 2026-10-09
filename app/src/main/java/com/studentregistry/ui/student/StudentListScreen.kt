@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.studentregistry.data.StudentEntity
-import com.studentregistry.model.AgeFilter
+import com.studentregistry.model.StudentListSort
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -29,9 +28,9 @@ fun StudentListScreen(
     teacherName: String,
     students: List<StudentEntity>,
     query: String,
-    selectedFilter: AgeFilter,
+    selectedFilter: StudentListSort,
     onQueryChange: (String) -> Unit,
-    onFilterChange: (AgeFilter) -> Unit,
+    onFilterChange: (StudentListSort) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenExport: () -> Unit,
     onExportSelectedCsv: (List<StudentEntity>) -> Unit,
@@ -51,6 +50,7 @@ fun StudentListScreen(
     var selectedStudentIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showExportOptions by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var showSortMenu by rememberSaveable { mutableStateOf(false) }
     val selectionMode = selectedStudentIds.isNotEmpty()
     val selectedStudents = remember(students, selectedStudentIds) {
         students.filter { it.id in selectedStudentIds }
@@ -190,47 +190,52 @@ fun StudentListScreen(
                                 innerTextField()
                             }
                         )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // --- Age filter chips ---
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AgeFilter.entries.forEach { filter ->
-                        val selected = selectedFilter == filter
-                        Surface(
-                            onClick = { onFilterChange(filter) },
-                            shape = RoundedCornerShape(50),
-                            color = if (selected) primaryTint else cardColor,
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = 1.dp,
-                                color = if (selected) colorScheme.primary.copy(alpha = 0.3f) else outlineColor
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (selected) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box {
+                            IconButton(onClick = { showSortMenu = true }) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (showSortMenu || selectedFilter != StudentListSort.ALL) {
+                                        primaryTint
+                                    } else {
+                                        Color.Transparent
+                                    }
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
+                                        imageVector = Icons.Default.FilterList,
+                                        contentDescription = "Filter students",
+                                        tint = if (showSortMenu || selectedFilter != StudentListSort.ALL) {
+                                            colorScheme.primary
+                                        } else {
+                                            secondaryTextColor
+                                        },
+                                        modifier = Modifier.padding(6.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
                                 }
-                                Text(
-                                    text = filter.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (selected) colorScheme.primary else secondaryTextColor
-                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false }
+                            ) {
+                                StudentListSort.entries.forEach { filter ->
+                                    DropdownMenuItem(
+                                        text = { Text(filter.label) },
+                                        onClick = {
+                                            onFilterChange(filter)
+                                            showSortMenu = false
+                                        },
+                                        leadingIcon = if (selectedFilter == filter) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

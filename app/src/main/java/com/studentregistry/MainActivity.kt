@@ -123,7 +123,6 @@ import com.studentregistry.data.SchoolRepository
 import com.studentregistry.data.StudentEntity
 import com.studentregistry.data.StudentRepository
 import com.studentregistry.export.ExportManager
-import com.studentregistry.model.AgeFilter
 import com.studentregistry.model.TeacherUser
 import com.studentregistry.ui.theme.StudentRegistryTheme
 
@@ -160,7 +159,9 @@ class MainActivity : ComponentActivity() {
             MainViewModelFactory(applicationContext, studentRepository, schoolRepository, settingsRepository)
         )[MainViewModel::class.java]
 
-        GoogleSignIn.getLastSignedInAccount(this)?.toTeacherUser()?.let(viewModel::setSignedInUser)
+        viewModel.initializeSession(
+            GoogleSignIn.getLastSignedInAccount(this)?.toTeacherUser()
+        )
 
         setContent {
             val settings by viewModel.settings.collectAsState()

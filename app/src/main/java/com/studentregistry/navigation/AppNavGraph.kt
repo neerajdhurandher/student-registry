@@ -8,7 +8,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,11 +41,31 @@ fun StudentRegistryNavGraph(
     val navController = rememberNavController()
     val user by viewModel.user.collectAsState()
     val schoolAccessState by viewModel.schoolAccessState.collectAsState()
+    val sessionBootstrapComplete by viewModel.isSessionBootstrapComplete.collectAsState()
     val students by viewModel.students.collectAsState()
     val searchQuery by viewModel.currentSearchQuery.collectAsState()
-    val ageFilter by viewModel.selectedAgeFilter.collectAsState()
+    val studentListSort by viewModel.selectedStudentListSort.collectAsState()
     val context = LocalContext.current
     val exportManager = remember(context) { ExportManager(context) }
+
+    if (!sessionBootstrapComplete) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            androidx.compose.foundation.layout.Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                Text(
+                    text = "Opening Student Registry...",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        return
+    }
 
     LaunchedEffect(user, schoolAccessState.school, schoolAccessState.loading) {
         when {
@@ -98,9 +123,9 @@ fun StudentRegistryNavGraph(
                 teacherName = user?.name.orEmpty(),
                 students = students,
                 query = searchQuery,
-                selectedFilter = ageFilter,
+                selectedFilter = studentListSort,
                 onQueryChange = viewModel::updateSearchQuery,
-                onFilterChange = viewModel::updateAgeFilter,
+                onFilterChange = viewModel::updateStudentListSort,
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenExport = { navController.navigate(Routes.EXPORT) },
                 onExportSelectedCsv = { selectedStudents ->

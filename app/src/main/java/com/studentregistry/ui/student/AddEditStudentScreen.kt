@@ -30,7 +30,8 @@ fun AddEditStudentScreen(
     var name by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.name.orEmpty()) }
     var age by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.age?.toString().orEmpty()) }
     var contact by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.contact.orEmpty()) }
-    var parentContact by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.parentContact.orEmpty()) }
+    var fatherPhone by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.fatherPhone.orEmpty()) }
+    var motherPhone by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.motherPhone.orEmpty()) }
     var aadhaarNumber by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.aadhaarNumber.orEmpty()) }
     var apparId by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.apparId.orEmpty()) }
     var penId by rememberSaveable(initialStudent?.id) { mutableStateOf(initialStudent?.penId.orEmpty()) }
@@ -58,7 +59,8 @@ fun AddEditStudentScreen(
         name = name,
         age = age,
         contact = contact,
-        parentContact = parentContact,
+        fatherPhone = fatherPhone,
+        motherPhone = motherPhone,
         aadhaarNumber = aadhaarNumber,
         apparId = apparId,
         penId = penId,
@@ -79,7 +81,8 @@ fun AddEditStudentScreen(
     val ageError = visibleFieldError(validationErrors.age, age, attemptedSave)
     val birthdayError = visibleFieldError(validationErrors.birthday, birthday, attemptedSave)
     val contactError = visibleFieldError(validationErrors.contact, contact, attemptedSave)
-    val parentContactError = visibleFieldError(validationErrors.parentContact, parentContact, attemptedSave)
+    val fatherPhoneError = visibleFieldError(validationErrors.fatherPhone, fatherPhone, attemptedSave)
+    val motherPhoneError = visibleFieldError(validationErrors.motherPhone, motherPhone, attemptedSave)
     val emailError = visibleFieldError(validationErrors.email, email, attemptedSave)
     val aadhaarError = visibleFieldError(validationErrors.aadhaarNumber, aadhaarNumber, attemptedSave)
     val apparIdError = visibleFieldError(validationErrors.apparId, apparId, attemptedSave)
@@ -166,7 +169,8 @@ fun AddEditStudentScreen(
                         applyRandomStudent = { randomStudent ->
                             name = randomStudent.name
                             contact = randomStudent.contact
-                            parentContact = randomStudent.parentContact
+                            fatherPhone = randomStudent.fatherPhone
+                            motherPhone = randomStudent.motherPhone
                             aadhaarNumber = randomStudent.aadhaarNumber
                             apparId = randomStudent.apparId
                             penId = randomStudent.penId
@@ -252,9 +256,9 @@ fun AddEditStudentScreen(
                     FormFieldLabel("Student Contact Number", required = false)
                     OutlinedTextField(
                         value = contact,
-                        onValueChange = { contact = it },
+                        onValueChange = { contact = normalizePhoneInput(it) },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("+91 9876543210") },
+                        placeholder = { Text("10-digit mobile number") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -263,25 +267,43 @@ fun AddEditStudentScreen(
                         isError = contactError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption(contactError ?: "Student personal mobile", isError = contactError != null)
+                    FormFieldCaption(contactError ?: "Student personal 10-digit mobile number", isError = contactError != null)
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    FormFieldLabel("Parent's Contact Number", required = false)
+                    FormFieldLabel("Father's Phone Number", required = false)
                     OutlinedTextField(
-                        value = parentContact,
-                        onValueChange = { parentContact = it },
+                        value = fatherPhone,
+                        onValueChange = { fatherPhone = normalizePhoneInput(it) },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("+91 9876543210") },
+                        placeholder = { Text("10-digit mobile number") },
                         leadingIcon = { Icon(Icons.Default.SupervisorAccount, contentDescription = null) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                         ),
-                        isError = parentContactError != null,
+                        isError = fatherPhoneError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption(parentContactError ?: "Primary parent or guardian mobile", isError = parentContactError != null)
+                    FormFieldCaption(fatherPhoneError ?: "Father's 10-digit mobile number", isError = fatherPhoneError != null)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    FormFieldLabel("Mother's Phone Number", required = false)
+                    OutlinedTextField(
+                        value = motherPhone,
+                        onValueChange = { motherPhone = normalizePhoneInput(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("10-digit mobile number") },
+                        leadingIcon = { Icon(Icons.Default.SupervisorAccount, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                        ),
+                        isError = motherPhoneError != null,
+                        colors = formFieldColors()
+                    )
+                    FormFieldCaption(motherPhoneError ?: "Mother's 10-digit mobile number", isError = motherPhoneError != null)
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -299,7 +321,7 @@ fun AddEditStudentScreen(
                         isError = emailError != null,
                         colors = formFieldColors()
                     )
-                    FormFieldCaption(emailError ?: "School or parent contact email", isError = emailError != null)
+                    FormFieldCaption(emailError ?: "School or family contact email", isError = emailError != null)
                 }
 
                 FormSectionCard {
@@ -640,6 +662,8 @@ fun AddEditStudentScreen(
         }
     }
 }
+
+private fun normalizePhoneInput(value: String): String = value.filter(Char::isDigit).take(10)
 
 @Composable
 private fun FormSectionCard(content: @Composable ColumnScope.() -> Unit) {

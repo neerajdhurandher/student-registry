@@ -13,18 +13,12 @@ interface StudentDao {
         SELECT * FROM students
         WHERE schoolId = :schoolId
           AND (name LIKE :searchPattern OR contact LIKE :searchPattern OR email LIKE :searchPattern)
-          AND (
-            :ageFilter = 'ALL' OR
-            (:ageFilter = 'MINOR' AND age < 18) OR
-            (:ageFilter = 'ADULT' AND age >= 18)
-          )
         ORDER BY name COLLATE NOCASE ASC
         """
     )
     fun observeStudents(
         schoolId: String,
-        searchPattern: String,
-        ageFilter: String
+        searchPattern: String
     ): Flow<List<StudentEntity>>
 
     @Query("SELECT * FROM students WHERE id = :id LIMIT 1")
