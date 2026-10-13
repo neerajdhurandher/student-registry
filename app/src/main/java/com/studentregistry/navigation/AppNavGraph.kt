@@ -42,6 +42,7 @@ fun StudentRegistryNavGraph(
     val user by viewModel.user.collectAsState()
     val schoolAccessState by viewModel.schoolAccessState.collectAsState()
     val sessionBootstrapComplete by viewModel.isSessionBootstrapComplete.collectAsState()
+    val startupSyncInProgress by viewModel.isStartupSyncInProgress.collectAsState()
     val students by viewModel.students.collectAsState()
     val searchQuery by viewModel.currentSearchQuery.collectAsState()
     val studentListSort by viewModel.selectedStudentListSort.collectAsState()
@@ -59,7 +60,7 @@ fun StudentRegistryNavGraph(
             ) {
                 CircularProgressIndicator()
                 Text(
-                    text = "Opening Student Registry...",
+                    text = if (startupSyncInProgress) "Syncing with Firebase..." else "Opening Student Registry...",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

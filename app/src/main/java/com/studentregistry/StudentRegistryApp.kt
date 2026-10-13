@@ -9,5 +9,6 @@ class StudentRegistryApp : Application() {
         super.onCreate()
         NotificationHelper.createBirthdayChannel(this)
         WorkerScheduler.scheduleBirthdayWorker(this)
+        WorkerScheduler.scheduleStartupSync(this)
     }
 }

@@ -12,7 +12,13 @@ interface StudentDao {
         """
         SELECT * FROM students
         WHERE schoolId = :schoolId
-          AND (name LIKE :searchPattern OR contact LIKE :searchPattern OR email LIKE :searchPattern)
+          AND (
+            name LIKE :searchPattern
+            OR contact LIKE :searchPattern
+            OR email LIKE :searchPattern
+            OR admissionNumber LIKE :searchPattern
+            OR apparId LIKE :searchPattern
+          )
         ORDER BY name COLLATE NOCASE ASC
         """
     )
@@ -27,8 +33,14 @@ interface StudentDao {
     @Query("SELECT * FROM students WHERE schoolId = :schoolId ORDER BY name COLLATE NOCASE ASC")
     fun observeBySchool(schoolId: String): Flow<List<StudentEntity>>
 
+    @Query("SELECT * FROM students")
+    suspend fun getAll(): List<StudentEntity>
+
     @Upsert
     suspend fun upsert(student: StudentEntity)
+
+    @Upsert
+    suspend fun upsertAll(students: List<StudentEntity>)
 
     @Delete
     suspend fun delete(student: StudentEntity)
@@ -44,4 +56,10 @@ interface StudentDao {
 
     @Query("DELETE FROM students WHERE schoolId = :schoolId")
     suspend fun deleteForSchool(schoolId: String)
+
+    @Query("DELETE FROM students")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM students WHERE id NOT IN (:ids)")
+    suspend fun deleteAllExcept(ids: List<String>)
 }

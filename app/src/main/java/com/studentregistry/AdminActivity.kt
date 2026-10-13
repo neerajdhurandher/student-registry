@@ -126,6 +126,9 @@ class AdminActivity : ComponentActivity() {
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     }
                 }
+                LaunchedEffect(Unit) {
+                    viewModel.refreshAdminSchools()
+                }
 
                 AdminScreen(
                     schools = schools,

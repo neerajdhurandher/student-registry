@@ -25,6 +25,8 @@ class SchoolRepository(
 
     fun observeSchools(): Flow<List<SchoolEntity>> = schoolDao.observeSchools()
 
+    suspend fun getCachedSchools(): List<SchoolEntity> = schoolDao.getAll()
+
     suspend fun createSchool(
         name: String,
         address: String,
@@ -39,6 +41,7 @@ class SchoolRepository(
             teacherEmailsCsv = teacherEmails.joinToString(","),
             studentIdsCsv = "",
             isActive = true,
+            isSynced = false,
             updatedAt = System.currentTimeMillis()
         )
         cacheSchool(school)
@@ -63,6 +66,7 @@ class SchoolRepository(
         teachers.add(normalizedTeacherEmail)
         val updated = current.copy(
             teacherEmailsCsv = teachers.joinToString(","),
+            isSynced = false,
             updatedAt = System.currentTimeMillis()
         )
         cacheSchool(updated)
@@ -93,6 +97,7 @@ class SchoolRepository(
             name = name.trim(),
             address = address.trim(),
             contactInformation = contactInformation.trim(),
+            isSynced = false,
             updatedAt = System.currentTimeMillis()
         )
         cacheSchool(updated)
@@ -113,6 +118,7 @@ class SchoolRepository(
         val current = getCachedSchool(normalizedSchoolId) ?: findSchoolById(normalizedSchoolId) ?: return null
         val updated = current.copy(
             isActive = isActive,
+            isSynced = false,
             updatedAt = System.currentTimeMillis()
         )
         cacheSchool(updated)
@@ -170,7 +176,7 @@ class SchoolRepository(
         val schoolSnapshot = firestore.collection("schools").document(normalizedSchoolId).get().await()
         if (!schoolSnapshot.exists()) return getCachedSchool(normalizedSchoolId)
 
-        val school = schoolSnapshot.toSchoolEntity()
+        val school = schoolSnapshot.toSchoolEntity(isSynced = true)
         cacheSchool(school)
 
         val studentSnapshots = firestore.collection("students")
@@ -185,6 +191,68 @@ class SchoolRepository(
         return school
     }
 
+    suspend fun syncAllSchoolsFromFirestore(): List<SchoolEntity> {
+        if (FirebaseApp.getApps(context).isEmpty()) return getCachedSchools()
+
+        val schoolSnapshots = firestore.collection("schools").get().await().documents
+        val students = firestore.collection("students")
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.toStudentEntityOrNull() }
+
+        val studentIdsBySchool = students
+            .groupBy { it.schoolId }
+            .mapValues { (_, schoolStudents) -> schoolStudents.map { it.id }.sorted() }
+        val schools = schoolSnapshots.map { snapshot ->
+            snapshot.toSchoolEntity(
+                studentIdsOverride = studentIdsBySchool[snapshot.id].orEmpty(),
+                isSynced = true
+            )
+        }
+
+        schoolDao.upsertAll(schools)
+        studentDao.upsertAll(students)
+
+        val remoteSchoolIds = schools.map { it.id }.toSet()
+        schoolDao.getAll()
+            .filterNot { it.id in remoteSchoolIds || !it.isSynced }
+            .forEach { schoolDao.deleteById(it.id) }
+
+        val remoteStudentIds = students.map { it.id }.toSet()
+        studentDao.getAll()
+            .filterNot { it.id in remoteStudentIds || !it.isSynced }
+            .forEach { studentDao.delete(it) }
+
+        return schools.sortedBy { it.name.lowercase() }
+    }
+
+    suspend fun addStudentToSchool(student: StudentEntity): SchoolEntity {
+        val school = getCachedSchool(student.schoolId) ?: findSchoolById(student.schoolId)
+            ?: error("School not found.")
+        val updatedSchool = school.copy(
+            studentIdsCsv = (parseCsv(school.studentIdsCsv) + student.id).distinct().joinToString(","),
+            isSynced = false,
+            updatedAt = maxOf(school.updatedAt, student.updatedAt)
+        )
+
+        studentDao.upsert(student.copy(isSynced = false))
+        schoolDao.upsert(updatedSchool)
+
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            firestore.collection("students").document(student.id)
+                .set(studentPayload(student), SetOptions.merge())
+                .await()
+            writeSchoolDocument(
+                school = updatedSchool,
+                teacherEmails = parseCsv(updatedSchool.teacherEmailsCsv),
+                includeStudents = true
+            )
+        }
+
+        return updatedSchool
+    }
+
     suspend fun submitAccessRequest(teacherEmail: String, teacherName: String, note: String) {
         if (FirebaseApp.getApps(context).isEmpty()) return
         val payload = mapOf(
@@ -197,17 +265,21 @@ class SchoolRepository(
         firestore.collection("school_access_requests").add(payload).await()
     }
 
-    private fun com.google.firebase.firestore.DocumentSnapshot.toSchoolEntity(): SchoolEntity {
+    private fun com.google.firebase.firestore.DocumentSnapshot.toSchoolEntity(
+        studentIdsOverride: List<String>? = null,
+        isSynced: Boolean = true
+    ): SchoolEntity {
         val teachers = get("teachers") as? List<*> ?: emptyList<Any>()
-        val students = get("students") as? List<*> ?: emptyList<Any>()
+        val students = studentIdsOverride ?: (get("students") as? List<*>)?.filterIsInstance<String>().orEmpty()
         return SchoolEntity(
             id = id,
             name = getString("name").orEmpty(),
             address = getString("address").orEmpty(),
             contactInformation = getString("contactInformation").orEmpty(),
             teacherEmailsCsv = teachers.filterIsInstance<String>().joinToString(","),
-            studentIdsCsv = students.filterIsInstance<String>().joinToString(","),
+            studentIdsCsv = students.joinToString(","),
             isActive = getBoolean("isActive") ?: true,
+            isSynced = isSynced,
             updatedAt = getLong("updatedAt") ?: System.currentTimeMillis()
         )
     }
@@ -259,6 +331,34 @@ class SchoolRepository(
             ),
             SetOptions.merge()
         ).await()
+    }
+
+    private fun studentPayload(student: StudentEntity): Map<String, Any> {
+        return mapOf(
+            "id" to student.id,
+            "teacherId" to student.teacherId,
+            "schoolId" to student.schoolId,
+            "name" to student.name,
+            "age" to student.age,
+            "contact" to student.contact,
+            "fatherPhone" to student.fatherPhone,
+            "motherPhone" to student.motherPhone,
+            "aadhaarNumber" to student.aadhaarNumber,
+            "apparId" to student.apparId,
+            "penId" to student.penId,
+            "fatherName" to student.fatherName,
+            "motherName" to student.motherName,
+            "religion" to student.religion,
+            "caste" to student.caste,
+            "bloodGroup" to student.bloodGroup,
+            "admissionNumber" to student.admissionNumber,
+            "admissionDate" to student.admissionDate,
+            "bankNameAddress" to student.bankNameAddress,
+            "email" to student.email,
+            "birthday" to student.birthday,
+            "notes" to student.notes,
+            "updatedAt" to student.updatedAt
+        )
     }
 
     private fun schoolPayload(

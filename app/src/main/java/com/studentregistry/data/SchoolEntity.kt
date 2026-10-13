@@ -12,5 +12,6 @@ data class SchoolEntity(
     val teacherEmailsCsv: String = "",
     val studentIdsCsv: String = "",
     val isActive: Boolean = true,
+    val isSynced: Boolean = true,
     val updatedAt: Long = System.currentTimeMillis()
 )

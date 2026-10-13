@@ -1,9 +1,25 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.gms.google-services")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val hasKeystoreProperties = keystorePropertiesFile.exists()
+
+if (hasKeystoreProperties) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+fun releaseSigningValue(key: String): String {
+    return keystoreProperties.getProperty(key)?.takeIf { it.isNotBlank() }
+        ?: error("Missing `$key` in keystore.properties.")
 }
 
 android {
@@ -19,8 +35,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasKeystoreProperties) {
+            create("release") {
+                storeFile = file(releaseSigningValue("storeFile"))
+                storePassword = releaseSigningValue("storePassword")
+                keyAlias = releaseSigningValue("keyAlias")
+                keyPassword = releaseSigningValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasKeystoreProperties) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -47,6 +77,16 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+if (
+    gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) } &&
+    !hasKeystoreProperties
+) {
+    error(
+        "Missing keystore.properties for release signing. Copy keystore.properties.example " +
+            "to keystore.properties and fill in your local keystore values."
+    )
 }
 
 dependencies {

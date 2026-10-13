@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 
 object WorkerScheduler {
     private const val BIRTHDAY_WORK_NAME: String = "birthday-reminders"
+    private const val STARTUP_SYNC_WORK_NAME: String = "startup-sync"
 
     fun scheduleBirthdayWorker(context: Context) {
         val request = PeriodicWorkRequestBuilder<BirthdayReminderWorker>(24, TimeUnit.HOURS).build()
@@ -62,6 +63,22 @@ object WorkerScheduler {
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             "cloud-sync-now-$schoolId",
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun scheduleStartupSync(context: Context) {
+        val request = OneTimeWorkRequestBuilder<StartupSyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            STARTUP_SYNC_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             request
         )

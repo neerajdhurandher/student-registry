@@ -74,7 +74,11 @@ fun StudentListScreen(
         modifier = Modifier.fillMaxSize(),
         color = screenColor
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             // --- Custom top app bar ---
             Row(
                 modifier = Modifier
@@ -182,7 +186,7 @@ fun StudentListScreen(
                             decorationBox = { innerTextField ->
                                 if (query.isEmpty()) {
                                     Text(
-                                        text = "Search by name, contact, or email...",
+                                        text = "Search by name, APAAR ID, admission no., or email ...",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = secondaryTextColor
                                     )

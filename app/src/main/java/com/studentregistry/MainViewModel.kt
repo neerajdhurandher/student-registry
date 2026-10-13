@@ -246,6 +246,7 @@ class MainViewModel(
     private val _messages = MutableSharedFlow<String>()
     private val schoolAccessUiState = MutableStateFlow(SchoolAccessUiState(loading = false))
     private val sessionBootstrapComplete = MutableStateFlow(false)
+    private val startupSyncInProgress = MutableStateFlow(false)
 
     val user: StateFlow<TeacherUser?> = currentUser
     val schoolAccessState: StateFlow<SchoolAccessUiState> = schoolAccessUiState
@@ -253,6 +254,7 @@ class MainViewModel(
     val currentSearchQuery: StateFlow<String> = searchQuery
     val messages = _messages.asSharedFlow()
     val isSessionBootstrapComplete: StateFlow<Boolean> = sessionBootstrapComplete
+    val isStartupSyncInProgress: StateFlow<Boolean> = startupSyncInProgress
 
     val settings: StateFlow<UiSettings> = settingsRepository.settings.stateIn(
         scope = viewModelScope,
@@ -323,27 +325,34 @@ class MainViewModel(
     ) {
         currentUser.value = user
         schoolAccessUiState.value = SchoolAccessUiState(loading = true)
+        startupSyncInProgress.value = true
         if (isBootstrap) {
             sessionBootstrapComplete.value = false
         }
         viewModelScope.launch {
-            settingsRepository.setActiveTeacherId(user.id)
-            val school = schoolRepository.findSchoolForTeacher(user.email)
-            if (school != null) {
-                val syncedSchool = schoolRepository.syncSchoolFromFirestore(school.id) ?: school
-                schoolRepository.cacheSchool(syncedSchool)
-                settingsRepository.setActiveSchoolId(syncedSchool.id)
-                schoolAccessUiState.value = SchoolAccessUiState(school = syncedSchool)
-                WorkerScheduler.scheduleCloudSync(appContext, syncedSchool.id, user.email)
-                if (showWelcomeMessage) {
-                    _messages.emit("Welcome ${user.name}")
+            runCatching {
+                settingsRepository.setActiveTeacherId(user.id)
+                val school = schoolRepository.findSchoolForTeacher(user.email)
+                if (school != null) {
+                    val syncedSchool = schoolRepository.syncSchoolFromFirestore(school.id) ?: school
+                    schoolRepository.cacheSchool(syncedSchool)
+                    settingsRepository.setActiveSchoolId(syncedSchool.id)
+                    schoolAccessUiState.value = SchoolAccessUiState(school = syncedSchool)
+                    WorkerScheduler.scheduleCloudSync(appContext, syncedSchool.id, user.email)
+                    if (showWelcomeMessage) {
+                        _messages.emit("Welcome ${user.name}")
+                    }
+                } else {
+                    settingsRepository.setActiveSchoolId("")
+                    schoolAccessUiState.value = SchoolAccessUiState(school = null)
+                    _messages.emit("Ask admin to add your email to a school.")
                 }
-            } else {
-                settingsRepository.setActiveSchoolId("")
-                schoolAccessUiState.value = SchoolAccessUiState(school = null)
-                _messages.emit("Ask admin to add your email to a school.")
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to refresh your school data.")
+            }.also {
+                startupSyncInProgress.value = false
+                sessionBootstrapComplete.value = true
             }
-            sessionBootstrapComplete.value = true
         }
     }
 
@@ -353,6 +362,7 @@ class MainViewModel(
             settingsRepository.setActiveTeacherId("")
             settingsRepository.setActiveSchoolId("")
             schoolAccessUiState.value = SchoolAccessUiState(loading = false)
+            startupSyncInProgress.value = false
             sessionBootstrapComplete.value = true
         }
     }
@@ -486,6 +496,16 @@ class MainViewModel(
         }
     }
 
+    fun refreshAdminSchools() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                schoolRepository.syncAllSchoolsFromFirestore()
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to refresh schools.")
+            }
+        }
+    }
+
     fun observeStudentsForSchool(schoolId: String) = studentRepository.observeStudentsForSchool(schoolId)
 
     fun addStudentForSchool(schoolId: String, teacherEmail: String, input: StudentFormInput) {
@@ -533,13 +553,15 @@ class MainViewModel(
                 birthday = input.birthday.trim(),
                 notes = input.notes.trim(),
                 updatedAt = System.currentTimeMillis(),
-                isSynced = false
+                isSynced = true
             )
-            studentRepository.saveStudent(student)
-            if (settings.value.cloudSyncEnabled) {
-                WorkerScheduler.triggerCloudSyncNow(appContext, normalizedSchoolId, normalizedTeacherEmail)
+            runCatching {
+                schoolRepository.addStudentToSchool(student)
+            }.onSuccess {
+                _messages.emit("Student added successfully.")
+            }.onFailure { error ->
+                _messages.emit(error.message ?: "Unable to add student.")
             }
-            _messages.emit("Student added successfully.")
         }
     }
 
